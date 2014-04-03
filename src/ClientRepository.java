@@ -34,6 +34,7 @@ public class ClientRepository extends Repository {
 		try{
 			BufferedWriter output = new BufferedWriter(new FileWriter(path + foldername + commitsFileName, true));
 			output.append(toWrite);
+			output.newLine();
 			output.close();
 		}catch(IOException e){
 			System.err.println("Cannot open commits file:" + e.getMessage());

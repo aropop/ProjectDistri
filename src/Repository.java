@@ -34,7 +34,7 @@ public abstract class Repository {
 			this.path = path;
 			this.files = new ArrayList<File>();
 			if (localRepDir.exists() && localRepDir.isDirectory())
-				readFromDir(path + foldername);
+				readFromDir(path);
 			else
 				createFolder();
 		} else {

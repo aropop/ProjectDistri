@@ -10,7 +10,7 @@ public class Commit implements Writeable {
 	private String message;
 	private Date time;
 	private ArrayList<File> files;
-	private UUID id; //see man uuid for more information
+	private UUID id; // see man uuid for more information
 	private static final String formStr = "yyyy.MM.dd/HH:mm:ss";
 	private static final SimpleDateFormat form = new SimpleDateFormat(formStr);
 
@@ -18,8 +18,10 @@ public class Commit implements Writeable {
 		this.message = m;
 		this.time = t;
 		this.files = new ArrayList<File>();
-		if(id == null){
+		if (id == null) {
 			this.id = UUID.randomUUID();
+		}else{
+			this.id = id;
 		}
 	}
 
@@ -30,9 +32,11 @@ public class Commit implements Writeable {
 	@Override
 	public String writeToString() {
 		String ret = "";
-		ret += form.format(time) + " \"" + message + "\" ";
-		for (File f : files) {
-			ret += f.getPath() + f.getName();
+		ret += form.format(time) + " \"" + message + "\" " + id.toString();
+		if (files != null) {
+			for (File f : files) {
+				ret += f.getPath() + f.getName();
+			}
 		}
 		return ret;
 	}
@@ -41,6 +45,9 @@ public class Commit implements Writeable {
 	public void readFromString(String str) {
 		try {
 			this.time = form.parse(str.substring(0, formStr.length()));
+			this.message = str.substring(str.indexOf("\"") + 1,
+					str.lastIndexOf("\"") - 1);
+			this.id = UUID.fromString(str.substring(str.lastIndexOf("\"" + 1)));
 		} catch (ParseException e) {
 			System.err.println("Wrong commit string: " + str);
 		}
