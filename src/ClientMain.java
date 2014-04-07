@@ -1,6 +1,9 @@
+import java.io.File;
 import java.util.Date;
 import java.util.Scanner;
 import java.util.UUID;
+
+import javax.swing.text.Position;
 
 public class ClientMain {
 	private static final String helpText = "Wrong command! \nUse: ClientMain [command] {options} (args)\n"
@@ -30,22 +33,66 @@ public class ClientMain {
 		input = sc.nextLine();
 		while (!input.equals("exit")) {
 			// command loop
-			System.out.print("> ");
 			Scanner scl = new Scanner(input);
 			if (scl.hasNext()) {
 				// has more otherwise it could block
 				String command = scl.next();
 				if (command.equals("add")) {
+					
+					//read files
+					while(scl.hasNext()){
+						cr.addFile(new File(System.getProperty("user.dir") + "/" +scl.next()));
+					}
+					
+					
+				} else if (command.equals("checkout")) {
+					
+					cr.checkout(scl.next(), scl.nextInt());
+					
+				} else if (command.equals("commit")) {
+					
+					//check for message option
 					String message = "";
-					if (scl.hasNext())
-						if (scl.next() == "-m")
-							message = input.substring(input.indexOf("\""), input.lastIndexOf("\""));
+					String possibleCommand = "";
+					if (scl.hasNext()){
+						possibleCommand = scl.next();
+						if (possibleCommand.equals("-m")){
+							scl.useDelimiter("\"");
+							scl.next(); //reads first half away
+							message = scl.next();
+							scl.useDelimiter(" ");
+							scl.next(); //reads spaces away
+						}
+					}
+					
+					//make commit object
 					Commit com = new Commit(message, new Date(),
 							UUID.randomUUID());
+				
+					//possible command could've been a file so let's check
+					if(!possibleCommand.equals("-m")){
+						com.addFile(new File(System.getProperty("user.dir") + "/" + possibleCommand));
+					}
+					
+					
+					//read files
+					while(scl.hasNext()){
+						com.addFile(new File(System.getProperty("user.dir") + "/" +scl.next()));
+					}
+					
+					
+					//send commit to repo
 					cr.addCommit(com);
-				} else if (command.equals("checkout")) {
-
+					
+				} else if (command.equals("test")) {
+					String test = "dit is \" een test \" nl";
+					Scanner slc = new Scanner(test);
+					slc.useDelimiter("");
+					slc.next();
+					System.out.println(slc.next());
+				
 				} else {
+					//else print help text
 					printHelp();
 				}
 			} else {
@@ -53,6 +100,7 @@ public class ClientMain {
 			}
 
 			// next command
+			System.out.print("> ");
 			input = sc.nextLine();
 		}
 

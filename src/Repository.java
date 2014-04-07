@@ -1,10 +1,17 @@
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.Reader;
+import java.net.Socket;
 import java.util.ArrayList;
+
+import org.apache.commons.io.IOUtils;
 
 /**
  * @author Arno De Witte
@@ -84,6 +91,43 @@ public abstract class Repository {
 	 * @param c
 	 */
 	public abstract void addCommit(Commit c);
+	
+	
+	
+	/**
+	 * Requests a file from the server and saves it in the repository folder
+	 * 
+	 * @param filename file to request from the server
+	 * @return File we have stored in the repository folder 
+	 * @throws IOException
+	 */
+	protected File requestFile(String filename, Socket socket) throws IOException{
+		
+		Message mes = new Message(filename, Message.Type.FileRequest, "");
+
+		File ret;
+		
+		try {
+			InputStream rawInput = socket.getInputStream();
+			OutputStream rawOutput = socket.getOutputStream();
+
+			FileOutputStream fout = new FileOutputStream(path + foldername + lastcommitfilesdirname + filename);
+			ObjectOutputStream out = new ObjectOutputStream(rawOutput);
+
+			out.writeObject(mes);
+
+			
+			IOUtils.copy(rawInput, fout);
+			
+			fout.close();
+
+			ret = new File(path + foldername + lastcommitfilesdirname + filename);
+		} finally {
+			socket.close();
+		}
+		
+		return ret;
+	}
 	
 	
 

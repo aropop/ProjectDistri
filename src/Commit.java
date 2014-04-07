@@ -10,35 +10,32 @@ public class Commit implements Writeable {
 	private String message;
 	private Date time;
 	private ArrayList<File> files;
-	private UUID id; // see man uuid for more information
+	private UUID id; // see 'man uuid' for more information
 	private static final String formStr = "yyyy.MM.dd/HH:mm:ss";
 	private static final SimpleDateFormat form = new SimpleDateFormat(formStr);
-
+	
+	
 	public Commit(String m, Date t, UUID id) {
 		this.message = m;
 		this.time = t;
 		this.files = new ArrayList<File>();
 		if (id == null) {
 			this.id = UUID.randomUUID();
-		}else{
+		} else {
 			this.id = id;
 		}
 	}
 
 	public void addFile(File f) {
-		files.add(f);
+		if (f.exists()) {
+			files.add(f);
+		} else {
+			System.out.println("File " + f.getName() + " does not exists!");
+		}
 	}
 
-	@Override
-	public String writeToString() {
-		String ret = "";
-		ret += form.format(time) + " \"" + message + "\" " + id.toString();
-		if (files != null) {
-			for (File f : files) {
-				ret += f.getPath() + f.getName();
-			}
-		}
-		return ret;
+	public ArrayList<File> getFiles() {
+		return files;
 	}
 
 	@Override
@@ -51,5 +48,18 @@ public class Commit implements Writeable {
 		} catch (ParseException e) {
 			System.err.println("Wrong commit string: " + str);
 		}
+	}
+
+	@Override
+	public String writeToString() {
+		String ret = "";
+		ret += form.format(time) + " \"" + message + "\" " + id.toString()
+				+ " ";
+		if (files != null) {
+			for (File f : files) {
+				ret += f.getPath() + " ";
+			}
+		}
+		return ret.substring(0, ret.length() - 1);
 	}
 }
