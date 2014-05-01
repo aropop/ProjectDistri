@@ -13,6 +13,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.net.ConnectException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
@@ -22,8 +24,9 @@ import org.apache.commons.io.IOUtils;
 public class ClientRepository extends Repository {
 	private static final String remoteFileName = "Remote";
 	public static final String getCheckOutString = "getCheckout";
+	public static final String getLastCommitString = "getLastCommit";
 	private boolean hasServer;
-	private String serverIP;
+	private InetAddress serverIP;
 	private int serverPort;
 
 	public ClientRepository(String path) throws Exception {
@@ -34,7 +37,7 @@ public class ClientRepository extends Repository {
 			BufferedReader br = new BufferedReader(new FileReader(path
 					+ foldername + filesfilename));
 			try {
-				serverIP = br.readLine();
+				serverIP = InetAddress.getByName(br.readLine());
 				serverPort = Integer.parseInt(br.readLine());
 			} catch (IOException e) {
 				System.err.println("Bad remote file: " + e.getMessage());
@@ -58,8 +61,8 @@ public class ClientRepository extends Repository {
 		// copy latest to latest folder
 		for (File f : c.getFiles()) {
 			try {
-				FileUtils.copyFile(f, new File(path + foldername
-						+ lastcommitfilesdirname + f.getName()));
+				FileUtils.copyFile(f, new File(path + lastcommitfilesdirname
+						+ f.getName()));
 			} catch (IOException e) {
 				System.err.println("Error copying file (" + f.getAbsolutePath()
 						+ ") to inside dir: " + e.getMessage());
@@ -70,6 +73,14 @@ public class ClientRepository extends Repository {
 		if (hasServer) {
 
 		}
+	}
+
+	public String status() {
+		String ret = "Current Files in repository: \n";
+		for (File f : files) {
+			ret += f.getAbsolutePath() + "\n";
+		}
+		return "";
 	}
 
 	public void addFile(File f) {
@@ -98,40 +109,53 @@ public class ClientRepository extends Repository {
 
 		System.out.println("Checkout on ip: " + ip + " and port: " + port);
 
-		Message mes = new Message(getCheckOutString, Message.Type.Info, null);
-
-		this.serverIP = ip;
-		this.serverPort = port;
+		Message mes = new Message(getCheckOutString, Message.Type.INFO, null);
 		try {
-			// Send message
+			// Can throw a parse exception
+			this.serverIP = InetAddress.getByName(ip);
+			this.serverPort = port;
+			this.hasServer = true;
+			
+			// Send messageInetAddress ip = InetAddress.getByName(args[0]);
 			Message response = sendMessageToRemote(mes);
+			
+			System.out.println("Got response from server, start downloading files!");
+			
 			// write to remote file
 			createRemoteFile();
 
 			// Process message response
-			if (response.getType() == Message.Type.Info) {
+			if (response.getType() == Message.Type.INFO) {
 				for (String file : response.getContentArray()) {
+					
+					System.out.println("Downloading file " + file);
+					
 					// loads file into repo and then copies to the working dir
 					FileUtils.copyFile(requestFile(file, getSocket()),
 							new File(path + file));
+					
+					//add file to files list
+					addFile(new File(path + file));
 				}
 			} else {
 				System.err.println("Incorrect response");
 			}
+		} catch (ConnectException e) {
+			System.err.println("Error: Could not checkout, " + e.getMessage());
 		} catch (IOException e) {
 			System.err.println("Error: Could not checkout, " + e.getMessage());
 		} catch (ClassNotFoundException e) {
 			System.err.println("Error: Problem with server, please try again");
 		}
 	}
-	
+
 	/**
 	 * 
 	 * 
 	 * @param f
 	 * @return boolean that sais if this file is in the repo
 	 */
-	public boolean hasFile(File f){
+	public boolean hasFile(File f) {
 		return files.contains(f);
 	}
 
@@ -145,26 +169,39 @@ public class ClientRepository extends Repository {
 	 * @throws ClassNotFoundException
 	 */
 	private Message sendMessageToRemote(Message mes) throws IOException,
-			ClassNotFoundException {
+			ClassNotFoundException, ConnectException {
 		Socket socket = getSocket();
-		Message response;
 
-		try {
-			InputStream rawInput = socket.getInputStream();
-			OutputStream rawOutput = socket.getOutputStream();
+		if (socket == null) {
+			
+			throw new ConnectException("Could not connect to remote!");
+			
+		} else {
 
-			ObjectInputStream in = new ObjectInputStream(rawInput);
-			ObjectOutputStream out = new ObjectOutputStream(rawOutput);
+			Message response;
 
-			out.writeObject(mes);
+			try {
+				
+				System.out.println("Sending Message (" + mes.getContent() + ")");
+				
+				InputStream rawInput = socket.getInputStream();
+				OutputStream rawOutput = socket.getOutputStream();
 
-			response = (Message) in.readObject();
+				
+				ObjectOutputStream out = new ObjectOutputStream(rawOutput);
+				
+				out.writeObject(mes);
+				out.flush();
+				
+				//do not open if can't collect something
+				ObjectInputStream in = new ObjectInputStream(rawInput);
+				response = (Message) in.readObject();
 
-		} finally {
-			socket.close();
+			} finally {
+				socket.close();
+			}
+			return response;
 		}
-
-		return response;
 	}
 
 	/**
@@ -192,7 +229,7 @@ public class ClientRepository extends Repository {
 		try {
 			output = new BufferedWriter(new FileWriter(path + foldername
 					+ commitsFileName, true));
-			output.append(serverIP);
+			output.append(serverIP.getHostAddress());
 			output.newLine();
 			output.append(((Integer) serverPort).toString());
 			output.newLine();

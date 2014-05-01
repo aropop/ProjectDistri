@@ -1,4 +1,7 @@
 import java.io.File;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.util.Date;
 import java.util.Scanner;
 import java.util.UUID;
@@ -38,61 +41,82 @@ public class ClientMain {
 				// has more otherwise it could block
 				String command = scl.next();
 				if (command.equals("add")) {
-					
-					//read files
-					while(scl.hasNext()){
-						cr.addFile(new File(System.getProperty("user.dir") + "/" +scl.next()));
+					// check to print err message
+					if (scl.hasNext()) {
+						// read files
+						while (scl.hasNext()) {
+							cr.addFile(new File(System.getProperty("user.dir")
+									+ "/" + scl.next()));
+						}
+					} else {
+						System.out
+								.println("No files given, usage: add <file> (<otherfiles>)");
 					}
-					
-					
+
 				} else if (command.equals("checkout")) {
-					
+
 					cr.checkout(scl.next(), scl.nextInt());
-					
+
 				} else if (command.equals("commit")) {
-					
-					//check for message option
+
+					// check for message option
 					String message = "";
 					String possibleCommand = "";
-					if (scl.hasNext()){
+					if (scl.hasNext()) {
 						possibleCommand = scl.next();
-						if (possibleCommand.equals("-m")){
+						if (possibleCommand.equals("-m")) {
 							scl.useDelimiter("\"");
-							scl.next(); //reads first half away
+							scl.next(); // reads first half away
 							message = scl.next();
 							scl.useDelimiter(" ");
-							scl.next(); //reads spaces away
+							scl.next(); // reads spaces away
 						}
 					}
-					
-					//make commit object
+
+					// make commit object
 					Commit com = new Commit(message, new Date(),
 							UUID.randomUUID());
-				
-					//possible command could've been a file so let's check
-					if(!possibleCommand.equals("-m")){
-						com.addFile(new File(System.getProperty("user.dir") + "/" + possibleCommand));
+
+					// possible command could've been a file so let's check
+					if (!possibleCommand.equals("-m")) {
+						File f = new File(System.getProperty("user.dir") + "/"
+								+ possibleCommand);
+						if (cr.hasFile(f))
+							com.addFile(f);
+						else
+							System.out
+									.println("File "
+											+ possibleCommand
+											+ " is not in this repository, please add by using the add command (see help for more info)");
 					}
+
+					// read files
+					while (scl.hasNext()) {
+						File f = new File(System.getProperty("user.dir") + "/"
+								+ scl.next());
+						if (cr.hasFile(f))
+							com.addFile(f);
+						else
+							System.out
+									.println("File "
+											+ f.getName()
+											+ " is not in this repository, please add by using the add command (see help for more info)");
 					
-					
-					//read files
-					while(scl.hasNext()){
-						com.addFile(new File(System.getProperty("user.dir") + "/" +scl.next()));
 					}
-					
-					
-					//send commit to repo
+
+					// send commit to repo
 					cr.addCommit(com);
-					
+
 				} else if (command.equals("test")) {
-					String test = "dit is \" een test \" nl";
-					Scanner slc = new Scanner(test);
-					slc.useDelimiter("");
-					slc.next();
-					System.out.println(slc.next());
-				
+					OutputStream o =  System.out;
+					try {
+						(new ObjectOutputStream(o)).writeObject(new Message("test", Message.Type.ERROR , "&"));
+					} catch (IOException e) {
+						System.out.println("blabla");
+					}
+
 				} else {
-					//else print help text
+					// else print help text
 					printHelp();
 				}
 			} else {

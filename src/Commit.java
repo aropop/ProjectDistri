@@ -3,9 +3,10 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Scanner;
 import java.util.UUID;
 
-public class Commit implements Writeable {
+public class Commit {
 
 	private String message;
 	private Date time;
@@ -13,6 +14,7 @@ public class Commit implements Writeable {
 	private UUID id; // see 'man uuid' for more information
 	private static final String formStr = "yyyy.MM.dd/HH:mm:ss";
 	private static final SimpleDateFormat form = new SimpleDateFormat(formStr);
+	public static final int lines = 5;
 	
 	
 	public Commit(String m, Date t, UUID id) {
@@ -38,28 +40,30 @@ public class Commit implements Writeable {
 		return files;
 	}
 
-	@Override
-	public void readFromString(String str) {
+	public void readFromString(ArrayList<String> strings) {
 		try {
-			this.time = form.parse(str.substring(0, formStr.length()));
-			this.message = str.substring(str.indexOf("\"") + 1,
-					str.lastIndexOf("\"") - 1);
-			this.id = UUID.fromString(str.substring(str.lastIndexOf("\"" + 1)));
+			this.time = form.parse(strings.get(0));
+			this.message = strings.get(1);
+			this.id = UUID.fromString(strings.get(2));
+			
+			
+			for(String fil : strings.subList(3, strings.size())){
+				addFile(new File(fil));
+			}
 		} catch (ParseException e) {
-			System.err.println("Wrong commit string: " + str);
+			System.err.println("Could not parse Time of commit");
 		}
 	}
 
-	@Override
 	public String writeToString() {
 		String ret = "";
-		ret += form.format(time) + " \"" + message + "\" " + id.toString()
-				+ " ";
+		ret += ":" + form.format(time) + "\n:" + message + "\n:" + id.toString()
+				+ "\n:";
 		if (files != null) {
 			for (File f : files) {
-				ret += f.getPath() + " ";
+				ret += f.getPath() + "\n:"; //we use colon because file paths can have whitespace
 			}
 		}
-		return ret.substring(0, ret.length() - 1);
+		return ret + "\nEND";
 	}
 }

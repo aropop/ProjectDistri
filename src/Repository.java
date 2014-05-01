@@ -22,16 +22,23 @@ import org.apache.commons.io.IOUtils;
 public abstract class Repository {
 	protected static final String foldername = ".vc/"; // vc = version control
 	protected static final String filesfilename = "files";
-	protected static final String lastcommitfilesdirname = "latest/";
+	protected static final String lastcommitfilesdirname =  foldername + "latest/";
 	protected static final String commitsFileName = "commits";
+	protected static final String[] filesToCreate = {filesfilename, commitsFileName};
+	protected static final String[] foldersToCreate = {foldername, lastcommitfilesdirname};
 	protected String path;
 	protected ArrayList<File> files;
+	protected ArrayList<Commit> commits;
 
-	/**TODO Auto-generated method stub
+	/**
 	 * @param path
 	 *            path to where you want to open the repository
 	 */
 	public Repository(String path) throws Exception {
+		//support directory names with no / ending
+		if(!path.substring(path.length() - 1, path.length()).equals("/"))
+			path = path + "/";
+		
 		// check path exists
 		File dir = new File(path);
 		if (dir.exists() && dir.isDirectory()) {
@@ -40,6 +47,7 @@ public abstract class Repository {
 			// initialisation
 			this.path = path;
 			this.files = new ArrayList<File>();
+			this.commits = new ArrayList<Commit>();
 			if (localRepDir.exists() && localRepDir.isDirectory())
 				readFromDir(path);
 			else
@@ -58,30 +66,60 @@ public abstract class Repository {
 	 * 
 	 */
 	private void readFromDir(String path) {
+		System.out.println("Directory already exists, reading...");
 		try {
+			//read files
 			BufferedReader br = new BufferedReader(new FileReader(path
 					+ foldername + filesfilename));
 			String file = br.readLine();
 			while (file != null) {
-				files.add(new File(path + foldername + lastcommitfilesdirname
-						+ file));
+				File f = new File(file);
+				if(!f.exists()){
+					System.err.println("File " + file + " does not exist!");
+				}
+				files.add(f);
+				
 				file = br.readLine();
+			}
+			
+			br.close();
+			
+			//read commits
+			br = new BufferedReader(new FileReader(path
+					+ foldername + commitsFileName));
+			String commitString = br.readLine();
+			while (commitString != null) {
+				ArrayList<String> arr = new ArrayList<String>();
+				while(commitString.substring(0,1).equals(":")){
+					arr.add(commitString.substring(1));
+					commitString = br.readLine();
+				}
+				Commit c = new Commit(null, null, null);
+				c.readFromString(arr);
+				commits.add(c);
+				commitString = br.readLine(); //should be the END
 			}
 		} catch (FileNotFoundException e) {
 			System.err.println("Cannot open repository, files missing");
 		} catch (IOException e) {
 			System.out.println("File missing");
-		}
+		} 
+		System.out.println("Reading succesfull!");
 	}
 
 	private void createFolder() {
+		System.out.println("Folder did not exits, creating...");
 		try {
-			(new File(path + foldername)).mkdir();
-			(new File(path + foldername + lastcommitfilesdirname)).mkdir();
-			(new File(path + foldername + filesfilename)).createNewFile();
+			for (String fol : foldersToCreate){
+				(new File(path + fol)).mkdir();
+			}
+			for (String fil : filesToCreate){
+				(new File(path + foldername + fil)).createNewFile();				
+			}
 		} catch (IOException e) {
 			System.err.println(e.getMessage());
 		}
+		System.out.println("Creating succesfull!");
 	}
 	
 	/**
@@ -103,7 +141,7 @@ public abstract class Repository {
 	 */
 	protected File requestFile(String filename, Socket socket) throws IOException{
 		
-		Message mes = new Message(filename, Message.Type.FileRequest, "");
+		Message mes = new Message(filename, Message.Type.FILEREQUEST, "");
 
 		File ret;
 		
@@ -111,7 +149,7 @@ public abstract class Repository {
 			InputStream rawInput = socket.getInputStream();
 			OutputStream rawOutput = socket.getOutputStream();
 
-			FileOutputStream fout = new FileOutputStream(path + foldername + lastcommitfilesdirname + filename);
+			FileOutputStream fout = new FileOutputStream(path + lastcommitfilesdirname + filename);
 			ObjectOutputStream out = new ObjectOutputStream(rawOutput);
 
 			out.writeObject(mes);
@@ -121,7 +159,7 @@ public abstract class Repository {
 			
 			fout.close();
 
-			ret = new File(path + foldername + lastcommitfilesdirname + filename);
+			ret = new File(path + lastcommitfilesdirname + filename);
 		} finally {
 			socket.close();
 		}

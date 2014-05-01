@@ -4,8 +4,13 @@ import java.io.Serializable;
 public class Message implements Serializable {
 	
 
-	public static enum Type {
-		Error, Succes, Info, FileRequest
+	private static final long serialVersionUID = 1L;
+
+	public static enum Type{
+		ERROR,
+		SUCCES,
+		INFO,
+		FILEREQUEST
 	}
 	
 	private String content;
