@@ -32,6 +32,11 @@ public class Message implements Serializable {
 	}
 	
 	public String[] getContentArray(){
+		if(splitter == null && content.length() != 0)
+			return new String[] { content };
+		else if (splitter == null)
+			return new String[] {};
+			
 		return content.split(splitter);
 	}
 	

@@ -10,6 +10,9 @@ import java.io.OutputStream;
 import java.io.Reader;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 import org.apache.commons.io.IOUtils;
 
@@ -26,30 +29,32 @@ public abstract class Repository {
 	protected static final String commitsFileName = "commits";
 	protected static final String[] filesToCreate = {filesfilename, commitsFileName};
 	protected static final String[] foldersToCreate = {foldername, lastcommitfilesdirname};
+	protected static final String noCommitString = "NOCOMMIT";
 	protected String path;
-	protected ArrayList<File> files;
-	protected ArrayList<Commit> commits;
+	protected Map<File, UUID> files;
+	protected Map<UUID, Commit> commits;
 
 	/**
 	 * @param path
 	 *            path to where you want to open the repository
+	 * @throws Exception 
 	 */
 	public Repository(String path) throws Exception {
+		this.path = path;
 		//support directory names with no / ending
 		if(!path.substring(path.length() - 1, path.length()).equals("/"))
-			path = path + "/";
+			this.path = path + "/";
 		
 		// check path exists
-		File dir = new File(path);
+		File dir = new File(this.path);
 		if (dir.exists() && dir.isDirectory()) {
 			// check if local directory exists
-			File localRepDir = new File(path + foldername);
+			File localRepDir = new File(this.path + foldername);
 			// initialisation
-			this.path = path;
-			this.files = new ArrayList<File>();
-			this.commits = new ArrayList<Commit>();
+			this.files = new HashMap<File, UUID>();
+			this.commits = new HashMap<UUID, Commit>();
 			if (localRepDir.exists() && localRepDir.isDirectory())
-				readFromDir(path);
+				readFromDir(this.path);
 			else
 				createFolder();
 		} else {
@@ -69,17 +74,27 @@ public abstract class Repository {
 		System.out.println("Directory already exists, reading...");
 		try {
 			//read files
-			BufferedReader br = new BufferedReader(new FileReader(path
-					+ foldername + filesfilename));
-			String file = br.readLine();
-			while (file != null) {
+			BufferedReader br = new BufferedReader(new FileReader(new File(path
+					+ foldername + filesfilename)));
+			String fileAndId = br.readLine();
+			while (fileAndId != null) {
+				
+				String[] spl = fileAndId.split("&");
+				String file = spl[0];
+				String id = spl[1];
+				
+				UUID id_t = null;
+				
+				if(!id.equals(noCommitString)) // should not happen on a server
+					id_t = UUID.fromString(id);
+				
 				File f = new File(file);
 				if(!f.exists()){
 					System.err.println("File " + file + " does not exist!");
 				}
-				files.add(f);
+				files.put(f, id_t);
 				
-				file = br.readLine();
+				fileAndId = br.readLine();
 			}
 			
 			br.close();
@@ -91,12 +106,12 @@ public abstract class Repository {
 			while (commitString != null) {
 				ArrayList<String> arr = new ArrayList<String>();
 				while(commitString.substring(0,1).equals(":")){
-					arr.add(commitString.substring(1));
+					arr.add(commitString);
 					commitString = br.readLine();
 				}
 				Commit c = new Commit(null, null, null);
 				c.readFromString(arr);
-				commits.add(c);
+				commits.put(c.getId(), c);
 				commitString = br.readLine(); //should be the END
 			}
 		} catch (FileNotFoundException e) {
@@ -122,13 +137,6 @@ public abstract class Repository {
 		System.out.println("Creating succesfull!");
 	}
 	
-	/**
-	 * 
-	 * Handles the adding of a commit
-	 * 
-	 * @param c
-	 */
-	public abstract void addCommit(Commit c);
 	
 	
 	

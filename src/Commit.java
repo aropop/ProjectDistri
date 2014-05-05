@@ -10,7 +10,7 @@ public class Commit {
 
 	private String message;
 	private Date time;
-	private ArrayList<File> files;
+	private ArrayList<String> files; // relative paths in the directory
 	private UUID id; // see 'man uuid' for more information
 	private static final String formStr = "yyyy.MM.dd/HH:mm:ss";
 	private static final SimpleDateFormat form = new SimpleDateFormat(formStr);
@@ -20,7 +20,7 @@ public class Commit {
 	public Commit(String m, Date t, UUID id) {
 		this.message = m;
 		this.time = t;
-		this.files = new ArrayList<File>();
+		this.files = new ArrayList<String>();
 		if (id == null) {
 			this.id = UUID.randomUUID();
 		} else {
@@ -28,31 +28,43 @@ public class Commit {
 		}
 	}
 
-	public void addFile(File f) {
-		if (f.exists()) {
+	/**
+	 * @param f whether this file exists should be checked before added
+	 */
+	public void addFile(String f) {
 			files.add(f);
-		} else {
-			System.out.println("File " + f.getName() + " does not exists!");
-		}
 	}
 
-	public ArrayList<File> getFiles() {
+	public String getMessage() {
+		return message;
+	}
+
+	public Date getTime() {
+		return time;
+	}
+
+	public ArrayList<String> getFiles() {
 		return files;
 	}
 
 	public void readFromString(ArrayList<String> strings) {
 		try {
-			this.time = form.parse(strings.get(0));
-			this.message = strings.get(1);
-			this.id = UUID.fromString(strings.get(2));
+			// We have to remove the : placed in writeToString
+			this.time = form.parse(strings.get(0).substring(1));
+			this.message = strings.get(1).substring(1);
+			this.id = UUID.fromString(strings.get(2).substring(1));
 			
 			
 			for(String fil : strings.subList(3, strings.size())){
-				addFile(new File(fil));
+				addFile(fil.substring(1));
 			}
 		} catch (ParseException e) {
 			System.err.println("Could not parse Time of commit");
 		}
+	}
+
+	public UUID getId() {
+		return id;
 	}
 
 	public String writeToString() {
@@ -60,8 +72,8 @@ public class Commit {
 		ret += ":" + form.format(time) + "\n:" + message + "\n:" + id.toString()
 				+ "\n:";
 		if (files != null) {
-			for (File f : files) {
-				ret += f.getPath() + "\n:"; //we use colon because file paths can have whitespace
+			for (String f : files) {
+				ret += f + "\n:"; //we use newlines because file paths can have whitespace
 			}
 		}
 		return ret + "\nEND";

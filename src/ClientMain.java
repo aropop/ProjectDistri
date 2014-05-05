@@ -2,6 +2,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Scanner;
 import java.util.UUID;
@@ -57,10 +58,33 @@ public class ClientMain {
 
 					cr.checkout(scl.next(), scl.nextInt());
 
+				} else if (command.equals("status")) {
+
+					System.out.println(cr.status());
+
+				} else if (command.equals("add-remote")) {
+
+					String ip;
+					int port;
+					String err = "Wrong use of add-remote, correct use: add-remote <ip> <port>";
+
+					if (scl.hasNext()) {
+						ip = scl.next();
+						if (scl.hasNext()) {
+							port = scl.nextInt();
+							cr.addRemote(ip, port);
+							System.out.println("Remote was added (ip: " + ip
+									+ ", port: " + port + ")");
+						} else
+							System.err.println(err);
+					} else
+						System.err.println(err);
+
 				} else if (command.equals("commit")) {
 
 					// check for message option
 					String message = "";
+					ArrayList<String> files = new ArrayList<String>();
 					String possibleCommand = "";
 					if (scl.hasNext()) {
 						possibleCommand = scl.next();
@@ -73,47 +97,20 @@ public class ClientMain {
 						}
 					}
 
-					// make commit object
-					Commit com = new Commit(message, new Date(),
-							UUID.randomUUID());
-
 					// possible command could've been a file so let's check
 					if (!possibleCommand.equals("-m")) {
-						File f = new File(System.getProperty("user.dir") + "/"
-								+ possibleCommand);
-						if (cr.hasFile(f))
-							com.addFile(f);
-						else
-							System.out
-									.println("File "
-											+ possibleCommand
-											+ " is not in this repository, please add by using the add command (see help for more info)");
+						files.add(possibleCommand);
 					}
 
 					// read files
 					while (scl.hasNext()) {
-						File f = new File(System.getProperty("user.dir") + "/"
-								+ scl.next());
-						if (cr.hasFile(f))
-							com.addFile(f);
-						else
-							System.out
-									.println("File "
-											+ f.getName()
-											+ " is not in this repository, please add by using the add command (see help for more info)");
-					
+						files.add(scl.next());
 					}
 
-					// send commit to repo
-					cr.addCommit(com);
+					cr.addCommit(message, files);
 
 				} else if (command.equals("test")) {
-					OutputStream o =  System.out;
-					try {
-						(new ObjectOutputStream(o)).writeObject(new Message("test", Message.Type.ERROR , "&"));
-					} catch (IOException e) {
-						System.out.println("blabla");
-					}
+					// TODO: remove debug code
 
 				} else {
 					// else print help text
