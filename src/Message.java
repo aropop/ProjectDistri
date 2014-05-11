@@ -10,7 +10,8 @@ public class Message implements Serializable {
 		ERROR,
 		SUCCES,
 		INFO,
-		FILEREQUEST
+		FILEREQUEST,
+		HEARTBEAT
 	}
 	
 	private String content;

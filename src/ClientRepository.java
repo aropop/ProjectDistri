@@ -18,11 +18,11 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
 public class ClientRepository extends Repository {
+
 	// Constants
 	private static final String remoteFileName = "Remote";
 
@@ -54,12 +54,13 @@ public class ClientRepository extends Repository {
 	 * @throws Exception
 	 */
 	public ClientRepository(String path) throws Exception {
+
 		super(path);
 		File remote = new File(this.path + foldername + remoteFileName);
 		if (remote.exists()) {
 			hasServer = true;
-			BufferedReader br = new BufferedReader(new FileReader(this.path
-					+ foldername + remoteFileName));
+			BufferedReader br = new BufferedReader(new FileReader(this.path + foldername
+					+ remoteFileName));
 			try {
 				serverIP = InetAddress.getByName(br.readLine());
 				serverPort = Integer.parseInt(br.readLine());
@@ -101,10 +102,9 @@ public class ClientRepository extends Repository {
 				filesCommited.set(counter, fn.substring(path.length()));
 
 			} else {
-				System.out
-						.println("The given file ("
-								+ fn
-								+ ") does not exists or is not yet added to this repository!");
+				System.out.println("The given file (" + fn
+						+ ") does not exists or is not yet added to this repository!");
+				return;
 			}
 
 			counter++;
@@ -123,13 +123,13 @@ public class ClientRepository extends Repository {
 			try {
 
 				// check if there is not interference between commits
-				Message checkLatestCommit = new Message(getLastCommitString,
-						Message.Type.INFO, null);
+				Message checkLatestCommit = new Message(getLastCommitString, Message.Type.INFO,
+						null);
 				Message fileList = sendMessageToRemote(checkLatestCommit);
 
 				// when no file list is returned (no files in server repository)
 				if (fileList.getContent().length() != 0) {
-					
+
 					String[] contentsArray = fileList.getContentArray();
 
 					for (String fileIdTuple : contentsArray) {
@@ -141,8 +141,7 @@ public class ClientRepository extends Repository {
 						String file = tuple[0];
 						String commitId = tuple[1];
 
-						String localCommitId = files.get(new File(path + file))
-								.toString();
+						String localCommitId = files.get(new File(path + file)).toString();
 
 						if (!localCommitId.equals(commitId)) {
 
@@ -160,7 +159,7 @@ public class ClientRepository extends Repository {
 				// the server
 				if (problem == CommitProblems.NONE) {
 
-					sendFilesToServer(filesCommited);
+					sendFilesAndCommitToServer(c);
 
 				}
 
@@ -182,30 +181,41 @@ public class ClientRepository extends Repository {
 			// write commit to commits
 			try {
 
-				BufferedWriter output = new BufferedWriter(new FileWriter(path
-						+ foldername + commitsFileName, true));
+				BufferedWriter output = new BufferedWriter(new FileWriter(path + foldername
+						+ commitsFileName, true));
 
 				output.append(toWrite);
 				output.newLine();
 
 				output.close();
 			} catch (IOException e) {
-				System.err
-						.println("Cannot open commits file:" + e.getMessage());
+				System.err.println("Cannot open commits file:" + e.getMessage());
 			}
 
 			// copy latest to latest folder
 			for (String f : c.getFiles()) {
+
+				// Overwrite the latest commit locally
+				files.put(new File(path + f), c.getId());
+
 				try {
+
 					// this will overwritten
-					FileUtils.copyFile(new File(path + f), new File(path
-							+ lastcommitfilesdirname + f));
+					FileUtils.copyFile(new File(path + f), new File(path + lastcommitfilesdirname
+							+ f));
 				} catch (IOException e) {
-					System.err.println("Error copying file (" + path + f
-							+ ") to inside dir: " + e.getMessage());
+					System.err.println("Error copying file (" + path + f + ") to inside dir: "
+							+ e.getMessage());
 				}
 			}
 
+			// write to files file
+			writeFilesFile();
+
+			System.out.println("Added commit (" + c.getId() + ")");
+
+		} else if (problem == CommitProblems.CON) {
+			System.out.println("There is a connection problem");
 		}
 
 	}
@@ -217,6 +227,7 @@ public class ClientRepository extends Repository {
 	 * @param port
 	 */
 	public void addRemote(String ip, int port) {
+
 		try {
 			this.serverIP = InetAddress.getByName(ip);
 			this.serverPort = port;
@@ -224,8 +235,7 @@ public class ClientRepository extends Repository {
 			// write to remote file
 			createRemoteFile();
 		} catch (UnknownHostException e) {
-			System.err.println("Failed to add this remote (ip: " + ip
-					+ ", port: " + port + ")");
+			System.err.println("Failed to add this remote (ip: " + ip + ", port: " + port + ")");
 		}
 	}
 
@@ -236,24 +246,22 @@ public class ClientRepository extends Repository {
 	 * @return String the textual status
 	 */
 	public String status() {
+
 		String ret = "Current Files in repository: \n";
 		for (Map.Entry<File, UUID> f : files.entrySet()) {
 			ret += f.getKey().getAbsolutePath() + " ";
 			if (f.getValue() != null)
-				ret += f.getValue() + " "
-						+ commits.get(f.getValue()).getMessage() + " "
+				ret += f.getValue() + " " + commits.get(f.getValue()).getMessage() + " "
 						+ commits.get(f.getValue()).getTime();
 			else
 				ret += "Not commited ";
 
 			ret += "\n";
 		}
-
-		if (hasServer)
-			ret += "Linked to server at " + serverIP.getHostAddress()
-					+ " on port " + serverPort;
-		else
-			ret += "Not linked to any server";
+		
+		ret += hasServer ? "Linked to server at " + serverIP.getHostAddress() + " on port "
+				+ serverPort + (heartBeat() ? " which is online" : " and is down")
+				: "Not linked to any server";
 
 		return ret;
 	}
@@ -265,7 +273,31 @@ public class ClientRepository extends Repository {
 	 *            The message to be send later
 	 */
 	private void sendMessageLater(Message newComMes) {
+
 		// TODO:
+	}
+
+	/**
+	 * Pings the server, so we know if it's alive
+	 * 
+	 * @return true if server is live, false if it's down
+	 */
+	public boolean heartBeat() {
+
+		Message m = new Message("", Message.Type.HEARTBEAT, null);
+		Message r;
+		try {
+			r = sendMessageToRemote(m);
+			return r == null;
+		} catch (ConnectException e) {
+			return false;
+		} catch (IOException e) {
+			return false;
+		} catch (ClassNotFoundException e) {
+			System.err.println("Server did not respond correctly");
+			return false;
+		}
+
 	}
 
 	/**
@@ -274,20 +306,21 @@ public class ClientRepository extends Repository {
 	 * @param f
 	 *            file to be added to the repository
 	 */
-	public void addFile(File f) {
-		if (f.exists()) { // file should exist
-			if (!hasFile(f)) { // no doubles
-				files.put(f, null); // no commit yet
-				BufferedWriter output;
-				try {
-					output = new BufferedWriter(new FileWriter(path
-							+ foldername + filesfilename, true));
-					output.append(f.getAbsolutePath() + "&" + noCommitString);
-					output.newLine();
-					output.close();
-				} catch (IOException e) {
-					System.err.println("Error: Opening file file");
-				}
+	public void addFile(String f) {
+
+		File f1 = new File(path + f);
+		File f2 = new File(f);
+		if (f1.exists()) { // file should exist
+			if (!hasFile(f1)) { // no doubles
+				files.put(f1, null); // no commit yet
+				writeFilesFile();
+			} else {
+				System.out.println("File was alreay in the repository");
+			}
+		} else if (f2.exists()) { // file should exist
+			if (!hasFile(f2)) { // no doubles
+				files.put(f2, null); // no commit yet
+				writeFilesFile();
 			} else {
 				System.out.println("File was alreay in the repository");
 			}
@@ -314,8 +347,7 @@ public class ClientRepository extends Repository {
 			// Send messageInetAddress ip = InetAddress.getByName(args[0]);
 			Message response = sendMessageToRemote(mes);
 
-			System.out
-					.println("Got response from server, start downloading files!");
+			System.out.println("Got response from server, start downloading files!");
 
 			// Process message response
 			if (response.getType() == Message.Type.INFO) {
@@ -324,20 +356,20 @@ public class ClientRepository extends Repository {
 					System.out.println("Downloading file " + file);
 
 					// loads file into repo and then copies to the working dir
-					FileUtils.copyFile(requestFile(file, getSocket()),
-							new File(path + file));
+					File newFile = new File(path + file);
+					Pair<File, UUID> p = requestFile(file, getSocket());
+					FileUtils.copyFile(p.getA(), newFile);
 
 					// add file to files list
-					addFile(new File(path + file));
+					files.put(newFile, p.getB());
 				}
 
 				// Update commits
-				Message m = sendMessageToRemote(new Message(getCommitFile,
-						Message.Type.INFO, null));
+				Message m = sendMessageToRemote(new Message(getCommitFile, Message.Type.INFO, null));
 
 				try {
-					BufferedWriter output = new BufferedWriter(new FileWriter(
-							path + foldername + commitsFileName, true));
+					BufferedWriter output = new BufferedWriter(new FileWriter(path + foldername
+							+ commitsFileName, true));
 					output.write(m.getContent());
 					output.newLine();
 					output.close();
@@ -362,6 +394,7 @@ public class ClientRepository extends Repository {
 	 * @return boolean that sais if this file is in the repo
 	 */
 	public boolean hasFile(File f) {
+
 		return files.containsKey(f);
 	}
 
@@ -374,8 +407,9 @@ public class ClientRepository extends Repository {
 	 * @throws IOException
 	 * @throws ClassNotFoundException
 	 */
-	private Message sendMessageToRemote(Message mes) throws IOException,
-			ClassNotFoundException, ConnectException {
+	private Message sendMessageToRemote(Message mes) throws IOException, ClassNotFoundException,
+			ConnectException {
+
 		Socket socket = getSocket();
 
 		if (socket == null) {
@@ -387,9 +421,8 @@ public class ClientRepository extends Repository {
 			Message response;
 
 			try {
-
-				System.out
-						.println("Sending Message (" + mes.getContent() + ")");
+				//TODO:delete
+				System.out.println("Sending Message (" + mes.getContent() + ")");
 
 				InputStream rawInput = socket.getInputStream();
 				OutputStream rawOutput = socket.getOutputStream();
@@ -409,8 +442,7 @@ public class ClientRepository extends Repository {
 
 			if (response != null)
 				if (response.getType() == Message.Type.ERROR)
-					System.out
-							.println("Message recieved from the server is an error");
+					System.out.println("Message recieved from the server is an error");
 
 			return response;
 		}
@@ -420,10 +452,10 @@ public class ClientRepository extends Repository {
 	 * Sends a list of files to the server, ie after a commit
 	 * 
 	 * @param filesCommited
-	 * @throws IOException
+	 * @throws Exception
 	 */
-	private void sendFilesToServer(ArrayList<String> filesCommited)
-			throws IOException {
+	private void sendFilesAndCommitToServer(Commit c) throws Exception {
+
 		Socket socket = getSocket();
 
 		if (socket == null) {
@@ -433,21 +465,28 @@ public class ClientRepository extends Repository {
 		} else {
 
 			OutputStream out = socket.getOutputStream();
+			InputStream in = socket.getInputStream();
 			ObjectOutputStream oOut = new ObjectOutputStream(out);
 
+			String globSplit = "&&";
+
+			// Make a list with the sizes
 			String fileList = "";
-			for (String f : filesCommited) {
+			for (String f : c.getFiles()) {
 				File actualFile = new File(path + f);
-				fileList += f + "&" + actualFile.length() + "&&";
+				fileList += f + "&" + actualFile.length() + globSplit;
 			}
 
-			Message toSendFiles = new Message(sendFilesString + "&&"
-					+ fileList.substring(0, fileList.length() - 1),
-					Message.Type.INFO, "&&");
+			// Create the message
+			Message sendCommit = new Message(newCommitMessage + globSplit + c.writeToString()
+					+ globSplit + fileList.substring(0, fileList.length() - globSplit.length()),
+					Message.Type.INFO, globSplit);
 
-			oOut.writeObject(toSendFiles);
+			// Add the Files
+			oOut.writeObject(sendCommit);
+			oOut.flush();
 
-			for (String f : filesCommited) {
+			for (String f : c.getFiles()) {
 
 				File file = new File(path + f);
 				InputStream inF = new FileInputStream(file);
@@ -457,7 +496,20 @@ public class ClientRepository extends Repository {
 
 			}
 
-			oOut.close();
+			// oOut.close();
+
+			// do not open if can't collect something
+			ObjectInputStream oIn = new ObjectInputStream(in);
+			try {
+				Message response = (Message) oIn.readObject();
+
+				if (response.getType() != Message.Type.SUCCES)
+					throw new Exception("Something went wrong on the server!");
+			} catch (ClassNotFoundException e) {
+				System.err.println("Could not read response (" + e.getMessage() + ")");
+			}
+
+			// socket.close();
 
 		}
 	}
@@ -468,9 +520,9 @@ public class ClientRepository extends Repository {
 	 * @throws IOException
 	 */
 	private Socket getSocket() throws IOException {
+
 		if (hasServer) {
-			InetSocketAddress serverAddress = new InetSocketAddress(serverIP,
-					serverPort);
+			InetSocketAddress serverAddress = new InetSocketAddress(serverIP, serverPort);
 			Socket socket = new Socket();
 			socket.connect(serverAddress);
 			return socket;
@@ -496,8 +548,7 @@ public class ClientRepository extends Repository {
 		// Write information to it
 		BufferedWriter output;
 		try {
-			output = new BufferedWriter(new FileWriter(path + foldername
-					+ remoteFileName, true));
+			output = new BufferedWriter(new FileWriter(path + foldername + remoteFileName, true));
 			output.append(serverIP.getHostAddress());
 			output.newLine();
 			output.append(((Integer) serverPort).toString());

@@ -1,13 +1,5 @@
-import java.io.File;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.Scanner;
-import java.util.UUID;
-
-import javax.swing.text.Position;
 
 public class ClientMain {
 	private static final String helpText = "Wrong command! \nUse: ClientMain [command] {options} (args)\n"
@@ -46,8 +38,7 @@ public class ClientMain {
 					if (scl.hasNext()) {
 						// read files
 						while (scl.hasNext()) {
-							cr.addFile(new File(System.getProperty("user.dir")
-									+ "/" + scl.next()));
+							cr.addFile(scl.next());
 						}
 					} else {
 						System.out
