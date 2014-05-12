@@ -31,6 +31,8 @@ public class ClientRepository extends Repository {
 	public static final String getCommitFile = "getCommitFile";
 	public static final String newCommitMessage = "newCommit";
 	public static final String sendFilesString = "sendingFiles";
+	public static final String listACommitsString= "listAllCommits";
+	
 
 	public static final String fileIdSplit = "|";
 
@@ -78,6 +80,7 @@ public class ClientRepository extends Repository {
 	 *            Message to add to the commit
 	 * @param filesCommited
 	 *            List of strings, these are the relative paths to the files
+	 * TODO: fix problem when server is 2 commits behind
 	 */
 	public void addCommit(String message, ArrayList<String> filesCommited) {
 
@@ -249,16 +252,19 @@ public class ClientRepository extends Repository {
 
 		String ret = "Current Files in repository: \n";
 		for (Map.Entry<File, UUID> f : files.entrySet()) {
-			ret += f.getKey().getAbsolutePath() + " ";
-			if (f.getValue() != null)
-				ret += f.getValue() + " " + commits.get(f.getValue()).getMessage() + " "
-						+ commits.get(f.getValue()).getTime();
-			else
-				ret += "Not commited ";
+			File latestFile = new File(path + lastcommitfilesdirname + f.getKey().getAbsolutePath().substring(path.length()));
+			try {
+				ret += f.getKey().getAbsolutePath() + (FileUtils.contentEquals(f.getKey(), latestFile) ? "" : "*")
+						+ " "
+						+ (f.getValue() == null ? "Not commited " : f.getValue() + " "
+								+ commits.get(f.getValue()).getMessage() + " "
+								+ commits.get(f.getValue()).getTime()) + "\n";
+			} catch (IOException e) {
+				System.out.println("Error reading files (" + e.getMessage() + ")");
+			}
 
-			ret += "\n";
 		}
-		
+
 		ret += hasServer ? "Linked to server at " + serverIP.getHostAddress() + " on port "
 				+ serverPort + (heartBeat() ? " which is online" : " and is down")
 				: "Not linked to any server";
@@ -397,6 +403,26 @@ public class ClientRepository extends Repository {
 
 		return files.containsKey(f);
 	}
+	
+	
+	public String listCommits(){
+		
+		Message list;
+		try {
+			list = sendMessageToRemote(new Message(listACommitsString, Message.Type.INFO, null));
+		} catch (ConnectException e) {
+			System.out.println("Error connecting");
+			return "";
+		} catch (IOException e) {
+			System.out.println("IO error: "+ e.getMessage());
+			return "";
+		} catch (ClassNotFoundException e) {
+			System.out.println("Error connecting");
+			return "";
+		}
+		
+		return list.getContent();
+	}
 
 	/**
 	 * Sends a message object to the remote server
@@ -421,7 +447,7 @@ public class ClientRepository extends Repository {
 			Message response;
 
 			try {
-				//TODO:delete
+				// TODO:delete
 				System.out.println("Sending Message (" + mes.getContent() + ")");
 
 				InputStream rawInput = socket.getInputStream();

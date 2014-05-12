@@ -103,6 +103,11 @@ public class ClientMain {
 				} else if (command.equals("test")) {
 					// TODO: remove debug code
 
+				}else if (command.equals("list-commits")) {
+					// Return a list of all the commits with it's files and date
+					
+					System.out.println(cr.listCommits());
+
 				} else {
 					// else print help text
 					printHelp();

@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
 public class ServerRepository extends Repository implements Runnable {
@@ -98,6 +99,21 @@ public class ServerRepository extends Repository implements Runnable {
 
 			sendFile(new File(path + inMes.getContent()), out);
 
+		} else if (inMes.getType() == Message.Type.HEARTBEAT) {
+			// file request
+
+			try {
+				(new ObjectOutputStream(out)).writeObject(new Message("", Message.Type.SUCCES, null));
+			} catch (IOException e) {
+				sendError("ERR HEARTBEAT", out);
+			}
+
+		} else if ((inMes.getType() == Message.Type.INFO)
+				&& inMes.getContent().equals(ClientRepository.listACommitsString)) {
+			// List commits
+			System.out.println("Requesting a list of commits");
+			buildListOfCommits(out);
+			
 		} else if ((inMes.getType() == Message.Type.INFO)
 				&& inMes.getContent().equals(ClientRepository.getCheckOutString)) {
 			// Checkout
@@ -143,6 +159,37 @@ public class ServerRepository extends Repository implements Runnable {
 		}
 	}
 
+	/**
+	 * Writes a message with a list of all commits
+	 * 
+	 * @param out
+	 */
+	private void buildListOfCommits(OutputStream out) {
+		
+		String ret = "                  ID                  |               Date               |         Message \n";
+		
+		for (Map.Entry<UUID, Commit> entr : commits.entrySet()){
+			
+			ret += entr.getKey() + " | " + entr.getValue().getTime().toString() + " | " + entr.getValue().getMessage() + "\n";
+			
+			ArrayList<String> fs = entr.getValue().getFiles();
+			
+			ret += "Files: \n";
+			
+			for (String fn : fs)
+				ret += "         ->     " + fn + "\n";
+			
+		}
+		
+		try {
+			(new ObjectOutputStream(out)).writeObject(new Message(ret, Message.Type.INFO, null));
+		} catch (IOException e) {
+			System.out.println("IO err : (" + e.getMessage() + ")");
+			sendError("IO ERR", out);
+		}
+		
+	}
+
 	private void sendLatestCommitString(OutputStream out) {
 
 		String mesCont = "";
@@ -174,7 +221,7 @@ public class ServerRepository extends Repository implements Runnable {
 	}
 
 	/**
-	 * Recieves Various files from a client
+	 * Receives Various files from a client
 	 * 
 	 * @param in
 	 * @param out
@@ -205,6 +252,9 @@ public class ServerRepository extends Repository implements Runnable {
 					in.read(tst);
 
 					fout.write(tst);
+					
+					// Copy file to working dir
+					FileUtils.copyFile(new File(path + lastcommitfilesdirname + fi), new File(path + fi));
 
 				} catch (FileNotFoundException e) {
 					System.err.println("Error surrounding file system");
@@ -235,7 +285,7 @@ public class ServerRepository extends Repository implements Runnable {
 	 * Sends the file names in a message to the client
 	 * 
 	 * @param oOut
-	 *            object ouput stream to send the message over
+	 *            object output stream to send the message over
 	 */
 	private void sendCheckout(ObjectOutputStream oOut) {
 

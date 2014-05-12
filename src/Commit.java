@@ -63,7 +63,8 @@ public class Commit {
 			this.message = strings.get(1).substring(1);
 			this.id = UUID.fromString(strings.get(2).substring(1));
 
-			for (String fil : strings.subList(3, strings.size() - 1)) {
+			// The END tag should be handled outside of this scope
+			for (String fil : strings.subList(3, strings.size())) {
 				addFile(fil.substring(1));
 			}
 		} catch (ParseException e) {
