@@ -4,13 +4,14 @@ import java.util.Scanner;
 public class ClientMain {
 
 	private static final String helpText = "Commands\n"
-			+ "* add (-m \"message\") <files>      => Adds files to the repository" 
-			+ "* add-remote ip port                => Adds a remote to the repository" 
-			+ "* checkout (ip port)                => Checksout from a remote"
-			+ "* commit (-m \"message\") <files>   => Commits files with a optional message"
-			+ "* list-commits                      => Lists the commits on the server"
-			+ "* status                            => Gives an overview of the state of your repository"
-			;
+			+ "* add (-m \"message\") <files>         => Adds files to the repository\n"   
+			+ "* add-remote ip port                 => Adds a remote to the repository\n" 
+			+ "* checkout (ip port)                 => Checksout from a remote\n"
+			+ "* commit (-m \"message\") <files>      => Commits files with a optional message\n"
+			+ "* diff file commitId (otherCommitId) => Shows a diff of the file with the head or if given an other commit\n"
+			+ "* list-commits                       => Lists the commits on the server\n"
+			+ "* status                             => Gives an overview of the state of your repository\n"
+			+ "* help                               => Shows this help";
 
 	/**
 	 * @param args
