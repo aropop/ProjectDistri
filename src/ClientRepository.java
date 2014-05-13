@@ -2,6 +2,7 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -14,8 +15,10 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
@@ -31,10 +34,10 @@ public class ClientRepository extends Repository {
 	public static final String getCommitFile = "getCommitFile";
 	public static final String newCommitMessage = "newCommit";
 	public static final String sendFilesString = "sendingFiles";
-	public static final String listACommitsString= "listAllCommits";
-	
+	public static final String listACommitsString = "listAllCommits";
+	public static final String getOldFile = "getOldFile";
 
-	public static final String fileIdSplit = "|";
+	public static final String fileIdSplit = "##";
 
 	// Enums
 	private enum CommitProblems {
@@ -80,7 +83,7 @@ public class ClientRepository extends Repository {
 	 *            Message to add to the commit
 	 * @param filesCommited
 	 *            List of strings, these are the relative paths to the files
-	 * TODO: fix problem when server is 2 commits behind
+	 *            TODO: fix problem when server is 2 commits behind
 	 */
 	public void addCommit(String message, ArrayList<String> filesCommited) {
 
@@ -170,6 +173,7 @@ public class ClientRepository extends Repository {
 				System.out
 						.println("Failed to send commit to server, will retry when connection is restored ("
 								+ e.getMessage() + ")");
+				e.printStackTrace();
 				// sendMessageLater(newComMes);
 				problem = CommitProblems.CON;
 			}
@@ -252,9 +256,11 @@ public class ClientRepository extends Repository {
 
 		String ret = "Current Files in repository: \n";
 		for (Map.Entry<File, UUID> f : files.entrySet()) {
-			File latestFile = new File(path + lastcommitfilesdirname + f.getKey().getAbsolutePath().substring(path.length()));
+			File latestFile = new File(path + lastcommitfilesdirname
+					+ f.getKey().getAbsolutePath().substring(path.length()));
 			try {
-				ret += f.getKey().getAbsolutePath() + (FileUtils.contentEquals(f.getKey(), latestFile) ? "" : "*")
+				ret += f.getKey().getAbsolutePath()
+						+ (FileUtils.contentEquals(f.getKey(), latestFile) ? "" : "*")
 						+ " "
 						+ (f.getValue() == null ? "Not commited " : f.getValue() + " "
 								+ commits.get(f.getValue()).getMessage() + " "
@@ -284,7 +290,7 @@ public class ClientRepository extends Repository {
 	}
 
 	/**
-	 * Pings the server, so we know if it's alive
+	 * Ping the server, so we know if it's alive
 	 * 
 	 * @return true if server is live, false if it's down
 	 */
@@ -294,7 +300,7 @@ public class ClientRepository extends Repository {
 		Message r;
 		try {
 			r = sendMessageToRemote(m);
-			return r == null;
+			return r != null;
 		} catch (ConnectException e) {
 			return false;
 		} catch (IOException e) {
@@ -303,6 +309,77 @@ public class ClientRepository extends Repository {
 			System.err.println("Server did not respond correctly");
 			return false;
 		}
+
+	}
+	
+	public String diff(String file, String oldCommitId, String newCommitId){
+		
+		File file1, file2;
+		String text1 = "", text2 = "", ret = "";
+		
+		// Get the files right
+		file1 = getOldCommitedFile(file, UUID.fromString(oldCommitId));
+		if(newCommitId == null)
+			file2 = new File(path + file);
+		else
+			file2 = getOldCommitedFile(file, UUID.fromString(newCommitId));
+		
+		// Error checking
+		if(file1 == null || file2 == null)
+			return "Cannot get old file right now, retry later";
+		else if (!file2.exists())
+			return "Cannot find a file for commit id: " + newCommitId;
+		else if(!file1.exists())
+			 return "Cannot find a file for commit id: " + oldCommitId;
+		
+		// Read files into strings
+		try {
+			text1 = FileUtils.readFileToString(file1);
+			text2 = FileUtils.readFileToString(file2);
+		} catch (IOException e) {
+			System.err.println("Could not show diff ("+ e.getMessage() + ")");
+		}
+		
+		// Get the differences
+		diff_match_patch dmp = new diff_match_patch();	
+		LinkedList<diff_match_patch.Diff> diffs = dmp.diff_main(text1, text2);
+		
+		// Print them out
+		for(diff_match_patch.Diff diff : diffs){
+			if(diff.operation == diff_match_patch.Operation.INSERT)
+				ret += "++   " + diff.text + "\n";
+			else if(diff.operation == diff_match_patch.Operation.DELETE)
+				ret += "--   "  + diff.text + "\n";
+		}
+
+		
+		return ret.substring(0, ret.length() - 1);
+	}
+
+	/**
+	 * Gets a previously committed file from the server
+	 * 
+	 * @param fn Filename of the file you want 
+	 * @param commitID The commit where you want it from
+	 * @return
+	 */
+	private File getOldCommitedFile(String fn, UUID commitID) {
+
+		// Check if we have file
+		File f = new File(path + oldCommitsFolderName + fn + commitID.toString());
+
+		if (!f.exists()) {
+
+			// Request from server
+			try {
+				f = requestFile(fn, commitID).getA();
+			} catch (IOException e) {
+				System.err.println("Could not get old file: " + e.getMessage());
+				return null;
+			}
+			
+		}
+		return f;
 
 	}
 
@@ -363,7 +440,7 @@ public class ClientRepository extends Repository {
 
 					// loads file into repo and then copies to the working dir
 					File newFile = new File(path + file);
-					Pair<File, UUID> p = requestFile(file, getSocket());
+					Pair<File, UUID> p = requestFile(file, null);
 					FileUtils.copyFile(p.getA(), newFile);
 
 					// add file to files list
@@ -396,6 +473,17 @@ public class ClientRepository extends Repository {
 	}
 
 	/**
+	 * Allow for checkouts when remote is already set
+	 */
+	public void checkout() {
+
+		if (hasServer)
+			checkout(serverIP.toString(), serverPort);
+		else
+			System.out.println("Add a remote first");
+	}
+
+	/**
 	 * @param f
 	 * @return boolean that sais if this file is in the repo
 	 */
@@ -403,10 +491,9 @@ public class ClientRepository extends Repository {
 
 		return files.containsKey(f);
 	}
-	
-	
-	public String listCommits(){
-		
+
+	public String listCommits() {
+
 		Message list;
 		try {
 			list = sendMessageToRemote(new Message(listACommitsString, Message.Type.INFO, null));
@@ -414,13 +501,13 @@ public class ClientRepository extends Repository {
 			System.out.println("Error connecting");
 			return "";
 		} catch (IOException e) {
-			System.out.println("IO error: "+ e.getMessage());
+			System.out.println("IO error: " + e.getMessage());
 			return "";
 		} catch (ClassNotFoundException e) {
 			System.out.println("Error connecting");
 			return "";
 		}
-		
+
 		return list.getContent();
 	}
 
@@ -583,5 +670,64 @@ public class ClientRepository extends Repository {
 		} catch (IOException e) {
 			System.err.println("Something went wrong writing remote files");
 		}
+	}
+
+	/**
+	 * Requests a file from the server and saves it in the repository folder
+	 * 
+	 * @param filename
+	 *            file to request from the server
+	 * @param id
+	 *            if this is not null we will ask for an older file
+	 * @return File we have stored in the repository folder
+	 * @throws IOException
+	 */
+	private Pair<File, UUID> requestFile(String filename, UUID id) throws IOException {
+
+		Socket socket = getSocket();
+
+		Message mes;
+		if (id == null)
+			mes = new Message(filename, Message.Type.FILEREQUEST, "");
+		else
+			mes = new Message(getOldFile + "&&" + filename + "&&" + id.toString(),
+					Message.Type.FILEREQUEST, "&&");
+
+		Pair<File, UUID> ret = new Pair<File, UUID>(null, null);
+
+		try {
+			InputStream rawInput = socket.getInputStream();
+			OutputStream rawOutput = socket.getOutputStream();
+
+			// Need to write to a different file
+			String pathToDownloadedFile;
+			if (id == null)
+				pathToDownloadedFile = path + lastcommitfilesdirname + filename;
+			else
+				pathToDownloadedFile = path + oldCommitsFolderName + filename + id.toString();
+			FileOutputStream fout = new FileOutputStream(pathToDownloadedFile);
+
+			ObjectOutputStream out = new ObjectOutputStream(rawOutput);
+
+			out.writeObject(mes);
+			out.flush();
+
+			ObjectInputStream in = new ObjectInputStream(rawInput);
+			Message response = (Message) in.readObject();
+
+			IOUtils.copy(rawInput, fout);
+
+			fout.close();
+
+			
+			ret = new Pair<File, UUID>(new File(pathToDownloadedFile),
+					UUID.fromString(response.getContent()));
+		} catch (ClassNotFoundException e) {
+			System.err.println("Error while reading response");
+		} finally {
+			socket.close();
+		}
+
+		return ret;
 	}
 }

@@ -2,13 +2,21 @@ import java.util.ArrayList;
 import java.util.Scanner;
 
 public class ClientMain {
-	private static final String helpText = "Wrong command! \nUse: ClientMain [command] {options} (args)\n"
-			+ "* add (-m) message files";
+
+	private static final String helpText = "Commands\n"
+			+ "* add (-m \"message\") <files>      => Adds files to the repository" 
+			+ "* add-remote ip port                => Adds a remote to the repository" 
+			+ "* checkout (ip port)                => Checksout from a remote"
+			+ "* commit (-m \"message\") <files>   => Commits files with a optional message"
+			+ "* list-commits                      => Lists the commits on the server"
+			+ "* status                            => Gives an overview of the state of your repository"
+			;
 
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) {
+
 		ClientRepository cr = null;
 		// check if path is given as argument
 		try {
@@ -18,8 +26,7 @@ public class ClientMain {
 				cr = new ClientRepository(System.getProperty("user.dir") + "/");
 			}
 		} catch (Exception e) {
-			System.err.println("Could not initialize a repository: "
-					+ e.getMessage());
+			System.err.println("Could not initialize a repository: " + e.getMessage());
 			return;
 		}
 
@@ -34,6 +41,9 @@ public class ClientMain {
 				// has more otherwise it could block
 				String command = scl.next();
 				if (command.equals("add")) {
+
+					// Add command
+
 					// check to print err message
 					if (scl.hasNext()) {
 						// read files
@@ -41,19 +51,12 @@ public class ClientMain {
 							cr.addFile(scl.next());
 						}
 					} else {
-						System.out
-								.println("No files given, usage: add <file> (<otherfiles>)");
+						System.out.println("No files given, usage: add <file> (<otherfiles>)");
 					}
 
-				} else if (command.equals("checkout")) {
-
-					cr.checkout(scl.next(), scl.nextInt());
-
-				} else if (command.equals("status")) {
-
-					System.out.println(cr.status());
-
 				} else if (command.equals("add-remote")) {
+
+					// Add-remote command
 
 					String ip;
 					int port;
@@ -64,14 +67,24 @@ public class ClientMain {
 						if (scl.hasNext()) {
 							port = scl.nextInt();
 							cr.addRemote(ip, port);
-							System.out.println("Remote was added (ip: " + ip
-									+ ", port: " + port + ")");
+							System.out.println("Remote was added (ip: " + ip + ", port: " + port
+									+ ")");
 						} else
 							System.err.println(err);
 					} else
 						System.err.println(err);
+				} else if (command.equals("checkout")) {
+
+					// Checkout command
+
+					if (scl.hasNext() && scl.hasNextInt())
+						cr.checkout(scl.next(), scl.nextInt());
+					else
+						cr.checkout();
 
 				} else if (command.equals("commit")) {
+
+					// Commit command
 
 					// check for message option
 					String message = "";
@@ -100,12 +113,45 @@ public class ClientMain {
 
 					cr.addCommit(message, files);
 
-				} else if (command.equals("test")) {
-					// TODO: remove debug code
+				} else if (command.equals("diff")) {
 
-				}else if (command.equals("list-commits")) {
-					// Return a list of all the commits with it's files and date
+					// Diff command
 					
+					String file, cid1, cid2;
+					if(scl.hasNext()){
+						
+						file = scl.next();
+						
+						if(scl.hasNext()){
+							
+							cid1 = scl.next();
+							
+							if(scl.hasNext()){
+								
+								// 2 commit ids given
+								cid2 = scl.next();
+								System.out.println(cr.diff(file, cid1, cid2));
+										
+							}else{
+								// Only 1 id given so with current head
+								System.out.println(cr.diff(file, cid1, null));
+								
+							}
+						} else
+							printHelp();
+					}else
+						printHelp();
+						
+
+				} else if (command.equals("status")) {
+
+					// Status command
+
+					System.out.println(cr.status());
+
+				} else if (command.equals("list-commits")) {
+					// Return a list of all the commits with it's files and date
+
 					System.out.println(cr.listCommits());
 
 				} else {
@@ -124,6 +170,7 @@ public class ClientMain {
 	}
 
 	private static void printHelp() {
+
 		System.out.println(helpText);
 	}
 

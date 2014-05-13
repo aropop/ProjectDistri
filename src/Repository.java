@@ -30,12 +30,14 @@ public abstract class Repository {
 	protected static final String lastcommitfilesdirname = foldername
 			+ "latest/";
 	protected static final String commitsFileName = "commits";
+	protected static final String oldCommitsFolderName = foldername + "oldCommits/";
 	protected static final String[] filesToCreate = { filesfilename,
 			commitsFileName };
-	protected static final String[] foldersToCreate = { foldername,
+	protected static final String[] foldersToCreate = { foldername, oldCommitsFolderName,
 			lastcommitfilesdirname };
 	protected static final String noCommitString = "NOCOMMIT";
 	protected static final String filesFileSplitter = "&";
+	
 	protected String path;
 	protected Map<File, UUID> files;
 	protected Map<UUID, Commit> commits;
@@ -53,9 +55,12 @@ public abstract class Repository {
 
 		// check path exists
 		File dir = new File(this.path);
+		
 		if (dir.exists() && dir.isDirectory()) {
+			
 			// check if local directory exists
 			File localRepDir = new File(this.path + foldername);
+			
 			// initialisation
 			this.files = new HashMap<File, UUID>();
 			this.commits = new HashMap<UUID, Commit>();
@@ -121,10 +126,13 @@ public abstract class Repository {
 					commitString = br.readLine();
 
 				}
+				arr.add(commitString); 
+				
 				Commit c = new Commit(null, null, null);
 				c.readFromString(arr);
 				commits.put(c.getId(), c);
-				commitString = br.readLine(); // should be the END
+				
+				commitString = br.readLine();
 			}
 		} catch (FileNotFoundException e) {
 			System.err.println("Cannot open repository, files missing");
@@ -152,47 +160,7 @@ public abstract class Repository {
 		System.out.println("Creating succesfull!");
 	}
 
-	/**
-	 * Requests a file from the server and saves it in the repository folder
-	 * 
-	 * @param filename
-	 *            file to request from the server
-	 * @return File we have stored in the repository folder
-	 * @throws IOException
-	 */
-	protected Pair<File, UUID> requestFile(String filename, Socket socket)
-			throws IOException {
 
-		Message mes = new Message(filename, Message.Type.FILEREQUEST, "");
-
-		Pair<File, UUID> ret = new Pair<File, UUID>(null, null);
-
-		try {
-			InputStream rawInput = socket.getInputStream();
-			OutputStream rawOutput = socket.getOutputStream();
-
-			FileOutputStream fout = new FileOutputStream(path
-					+ lastcommitfilesdirname + filename);
-			ObjectOutputStream out = new ObjectOutputStream(rawOutput);
-			ObjectInputStream in = new ObjectInputStream(rawInput);
-
-			out.writeObject(mes);
-			
-			Message response = (Message) in.readObject();
-
-			IOUtils.copy(rawInput, fout);
-
-			fout.close();
-
-			ret = new Pair<File, UUID>(new File(path + lastcommitfilesdirname + filename), UUID.fromString(response.getContent()));
-		} catch (ClassNotFoundException e) {
-			System.err.println("Error while reading response");
-		} finally {
-			socket.close();
-		}
-
-		return ret;
-	}
 
 	/**
 	 * Writes the file that contains a list of files and id's

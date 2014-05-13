@@ -21,7 +21,6 @@ import org.apache.commons.io.IOUtils;
 
 public class ServerRepository extends Repository implements Runnable {
 
-	private static final String oldCommitsFolderName = "oldCommits/";
 
 	private ServerSocket serverSocket;
 	private int port;
@@ -35,11 +34,6 @@ public class ServerRepository extends Repository implements Runnable {
 	public ServerRepository(String user, int port) throws Exception {
 
 		super(user);
-
-		// Server repository specific stuff
-		File oldDir = new File(path + foldername + oldCommitsFolderName);
-		if (!oldDir.exists())
-			oldDir.mkdir();
 
 		// Manage Connection
 		this.port = port;
@@ -97,13 +91,31 @@ public class ServerRepository extends Repository implements Runnable {
 		} else if (inMes.getType() == Message.Type.FILEREQUEST) {
 			// file request
 
-			sendFile(new File(path + inMes.getContent()), out);
+			if (inMes.getContent().contains(ClientRepository.getOldFile) && !inMes.getContent().contains(path + foldername)) {
+
+				// Get old commited file
+				
+				String[] arr = inMes.getContentArray();
+				String file = arr[1], commit = arr[2];
+				
+				sendFile(new File(path + oldCommitsFolderName + file + commit), out, commit);
+
+			} else if (inMes.getContent().contains(path + foldername))
+				// Client cannot get every file here for security reasons
+				try {
+					out.write(0);
+				} catch (IOException e) {
+					System.out.println("Write error!" + e.getMessage());
+				}
+			else
+				sendFile(new File(path + inMes.getContent()), out, null);
 
 		} else if (inMes.getType() == Message.Type.HEARTBEAT) {
 			// file request
 
 			try {
-				(new ObjectOutputStream(out)).writeObject(new Message("", Message.Type.SUCCES, null));
+				(new ObjectOutputStream(out))
+						.writeObject(new Message("", Message.Type.SUCCES, null));
 			} catch (IOException e) {
 				sendError("ERR HEARTBEAT", out);
 			}
@@ -113,7 +125,7 @@ public class ServerRepository extends Repository implements Runnable {
 			// List commits
 			System.out.println("Requesting a list of commits");
 			buildListOfCommits(out);
-			
+
 		} else if ((inMes.getType() == Message.Type.INFO)
 				&& inMes.getContent().equals(ClientRepository.getCheckOutString)) {
 			// Checkout
@@ -128,7 +140,7 @@ public class ServerRepository extends Repository implements Runnable {
 
 			// Request commits file while checking out
 
-			sendFile(new File(path + foldername + commitsFileName), out);
+			sendFile(new File(path + foldername + commitsFileName), out, "");
 
 		} else if ((inMes.getType() == Message.Type.INFO)
 				&& inMes.getContentArray()[0].equals(ClientRepository.newCommitMessage)) {
@@ -165,29 +177,30 @@ public class ServerRepository extends Repository implements Runnable {
 	 * @param out
 	 */
 	private void buildListOfCommits(OutputStream out) {
-		
-		String ret = "                  ID                  |               Date               |         Message \n";
-		
-		for (Map.Entry<UUID, Commit> entr : commits.entrySet()){
-			
-			ret += entr.getKey() + " | " + entr.getValue().getTime().toString() + " | " + entr.getValue().getMessage() + "\n";
-			
+
+		String ret = "                 ID                  |              Date             |         Message \n";
+
+		for (Map.Entry<UUID, Commit> entr : commits.entrySet()) {
+
+			ret += entr.getKey() + " | " + entr.getValue().getTime().toString() + " | "
+					+ entr.getValue().getMessage() + "\n";
+
 			ArrayList<String> fs = entr.getValue().getFiles();
-			
+
 			ret += "Files: \n";
-			
+
 			for (String fn : fs)
 				ret += "         ->     " + fn + "\n";
-			
+
 		}
-		
+
 		try {
 			(new ObjectOutputStream(out)).writeObject(new Message(ret, Message.Type.INFO, null));
 		} catch (IOException e) {
 			System.out.println("IO err : (" + e.getMessage() + ")");
 			sendError("IO ERR", out);
 		}
-		
+
 	}
 
 	private void sendLatestCommitString(OutputStream out) {
@@ -197,7 +210,8 @@ public class ServerRepository extends Repository implements Runnable {
 
 		for (Map.Entry<File, UUID> entr : files.entrySet()) {
 
-			mesCont += entr.getKey() + ClientRepository.fileIdSplit + entr.getValue() + sep;
+			mesCont += entr.getKey().getAbsolutePath().substring(path.length())
+					+ ClientRepository.fileIdSplit + entr.getValue() + sep;
 
 		}
 
@@ -243,8 +257,8 @@ public class ServerRepository extends Repository implements Runnable {
 				try {
 					// Copy old file
 					if (existingFile.exists())
-						existingFile.renameTo(new File(path + foldername + oldCommitsFolderName
-								+ fi + this.files.get(existingFile)));
+						existingFile.renameTo(new File(path + oldCommitsFolderName
+								+ fi + this.files.get(new File(path + fi))));
 
 					FileOutputStream fout = new FileOutputStream(path + lastcommitfilesdirname + fi);
 
@@ -252,9 +266,10 @@ public class ServerRepository extends Repository implements Runnable {
 					in.read(tst);
 
 					fout.write(tst);
-					
+
 					// Copy file to working dir
-					FileUtils.copyFile(new File(path + lastcommitfilesdirname + fi), new File(path + fi));
+					FileUtils.copyFile(new File(path + lastcommitfilesdirname + fi), new File(path
+							+ fi));
 
 				} catch (FileNotFoundException e) {
 					System.err.println("Error surrounding file system");
@@ -317,7 +332,7 @@ public class ServerRepository extends Repository implements Runnable {
 
 		// Update files
 		for (String f : c.getFiles()) {
-			
+
 			// Will overwrite existing files
 			files.put(new File(path + f), c.getId());
 		}
@@ -327,7 +342,6 @@ public class ServerRepository extends Repository implements Runnable {
 
 		// Rewrite files file
 		writeFilesFile();
-		
 
 		// Write commit in file
 		String toWrite = c.writeToString();
@@ -342,14 +356,14 @@ public class ServerRepository extends Repository implements Runnable {
 		}
 
 		System.out.println("Updated files");
-		
+
 		// Recieve files after a commit
 		recieveFiles(in, out, filesAndSizes);
 
 		System.out.println("Recieved Files, sending response");
-		
+
 		Message response = new Message("Succes", Message.Type.SUCCES, null);
-		
+
 		try {
 			ObjectOutputStream oout = new ObjectOutputStream(out);
 			oout.writeObject(response);
@@ -365,15 +379,22 @@ public class ServerRepository extends Repository implements Runnable {
 	/**
 	 * Sends the file over the output stream, also writes the id in a message
 	 * 
-	 * @param f
-	 * @param out
+	 * @param f File to send
+	 * @param out Outputstream to send over
+	 * @param id Id to give back, could not be the most recent file so it's not always in our map
 	 */
-	private void sendFile(File f, OutputStream out) {
+	private void sendFile(File f, OutputStream out, String id) {
 
 		InputStream in;
 		try {
 			ObjectOutputStream oOut = new ObjectOutputStream(out);
-			oOut.writeObject(new Message(files.get(f).toString(), Message.Type.SUCCES, null));
+			
+			// if id is given we don't look it up
+			if(id == null)
+				oOut.writeObject(new Message(files.get(f).toString(), Message.Type.SUCCES, null));
+			else
+				oOut.writeObject(new Message(id, Message.Type.SUCCES, null));
+			
 			in = new FileInputStream(f);
 			IOUtils.copy(in, out);
 		} catch (FileNotFoundException e) {
