@@ -81,9 +81,13 @@ public class ClientMain {
 
 					// Checkout command
 
-					if (scl.hasNext() && scl.hasNextInt())
-						cr.checkout(scl.next(), scl.nextInt());
-					else
+					if (scl.hasNext()){
+						String ip = scl.next();
+						if(scl.hasNextInt())
+							cr.checkout(ip, scl.nextInt());
+						else
+							printHelp();
+					}else
 						cr.checkout();
 
 				} else if (command.equals("commit")) {

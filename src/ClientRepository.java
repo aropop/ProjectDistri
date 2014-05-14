@@ -15,7 +15,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedList;
@@ -311,56 +310,97 @@ public class ClientRepository extends Repository {
 		}
 
 	}
-	
-	public String diff(String file, String oldCommitId, String newCommitId){
-		
+
+	/**
+	 * Shows the diff between of a file in 2 commits, if the commit is not given
+	 * the diff is shown with the head
+	 * 
+	 * @param file
+	 * @param oldCommitId
+	 * @param newCommitId
+	 * @return String which is an overview of deleted and added lines
+	 */
+	public String diff(String file, String oldCommitId, String newCommitId) {
+
 		File file1, file2;
 		String text1 = "", text2 = "", ret = "";
-		
+
 		// Get the files right
 		file1 = getOldCommitedFile(file, UUID.fromString(oldCommitId));
-		if(newCommitId == null)
+		if (newCommitId == null)
 			file2 = new File(path + file);
 		else
 			file2 = getOldCommitedFile(file, UUID.fromString(newCommitId));
-		
+
 		// Error checking
-		if(file1 == null || file2 == null)
+		if (file1 == null || file2 == null)
 			return "Cannot get old file right now, retry later";
 		else if (!file2.exists())
 			return "Cannot find a file for commit id: " + newCommitId;
-		else if(!file1.exists())
-			 return "Cannot find a file for commit id: " + oldCommitId;
-		
+		else if (!file1.exists())
+			return "Cannot find a file for commit id: " + oldCommitId;
+
 		// Read files into strings
 		try {
 			text1 = FileUtils.readFileToString(file1);
 			text2 = FileUtils.readFileToString(file2);
 		} catch (IOException e) {
-			System.err.println("Could not show diff ("+ e.getMessage() + ")");
-		}
-		
-		// Get the differences
-		diff_match_patch dmp = new diff_match_patch();	
-		LinkedList<diff_match_patch.Diff> diffs = dmp.diff_main(text1, text2);
-		
-		// Print them out
-		for(diff_match_patch.Diff diff : diffs){
-			if(diff.operation == diff_match_patch.Operation.INSERT)
-				ret += "++   " + diff.text + "\n";
-			else if(diff.operation == diff_match_patch.Operation.DELETE)
-				ret += "--   "  + diff.text + "\n";
+			System.err.println("Could not show diff (" + e.getMessage() + ")");
 		}
 
-		
+		// Get the differences
+		diff_match_patch dmp = new diff_match_patch();
+		LinkedList<diff_match_patch.Diff> diffs = dmp.diff_main(text1, text2);
+
+		// Print them out
+		for (diff_match_patch.Diff diff : diffs) {
+			if (diff.operation == diff_match_patch.Operation.INSERT)
+				ret += "++   " + diff.text + "\n";
+			else if (diff.operation == diff_match_patch.Operation.DELETE)
+				ret += "--   " + diff.text + "\n";
+		}
+
 		return ret.substring(0, ret.length() - 1);
+	}
+
+	public void update() {
+
+		// Can't update if we are not connected
+		if (hasServer) {
+
+			// Backup all the files to the oldCommit folder for performance
+			for (Map.Entry<File, UUID> ent : files.entrySet()) {
+
+				// Files in folders support
+				File oldCoFi = new File(path + oldCommitsFolderName
+						+ ent.getKey().getPath().substring(path.length())
+						+ ent.getValue().toString());
+				oldCoFi.getParentFile().mkdirs();
+
+				try {
+					
+					oldCoFi.createNewFile();
+					FileUtils.copyFile(ent.getKey(), oldCoFi);
+					
+				} catch (IOException e) {
+					System.out.println("Error backing up old files (" + e.getMessage() + ")");
+				}
+
+			}
+
+			// A checkout will just overwrite the existing files
+			checkout();
+
+		}
 	}
 
 	/**
 	 * Gets a previously committed file from the server
 	 * 
-	 * @param fn Filename of the file you want 
-	 * @param commitID The commit where you want it from
+	 * @param fn
+	 *            Filename of the file you want
+	 * @param commitID
+	 *            The commit where you want it from
 	 * @return
 	 */
 	private File getOldCommitedFile(String fn, UUID commitID) {
@@ -377,7 +417,7 @@ public class ClientRepository extends Repository {
 				System.err.println("Could not get old file: " + e.getMessage());
 				return null;
 			}
-			
+
 		}
 		return f;
 
@@ -446,6 +486,8 @@ public class ClientRepository extends Repository {
 					// add file to files list
 					files.put(newFile, p.getB());
 				}
+				
+				writeFilesFile();
 
 				// Update commits
 				Message m = sendMessageToRemote(new Message(getCommitFile, Message.Type.INFO, null));
@@ -454,10 +496,12 @@ public class ClientRepository extends Repository {
 					BufferedWriter output = new BufferedWriter(new FileWriter(path + foldername
 							+ commitsFileName, true));
 					output.write(m.getContent());
-					output.newLine();
 					output.close();
+
+					readCommits();
+
 				} catch (IOException e) {
-					System.err.println("Error: Updating commits file");
+					System.err.println("Error: Updating commits file (" + e.getMessage() + ")");
 				}
 
 			} else {
@@ -492,6 +536,11 @@ public class ClientRepository extends Repository {
 		return files.containsKey(f);
 	}
 
+	/**
+	 * Returns a list of all the commits
+	 * 
+	 * @return String with all an overview of all the commits
+	 */
 	public String listCommits() {
 
 		Message list;
@@ -705,6 +754,10 @@ public class ClientRepository extends Repository {
 				pathToDownloadedFile = path + lastcommitfilesdirname + filename;
 			else
 				pathToDownloadedFile = path + oldCommitsFolderName + filename + id.toString();
+			
+			// Create folders if they are not there yet
+			(new File(pathToDownloadedFile)).getParentFile().mkdirs();
+			
 			FileOutputStream fout = new FileOutputStream(pathToDownloadedFile);
 
 			ObjectOutputStream out = new ObjectOutputStream(rawOutput);
@@ -719,9 +772,8 @@ public class ClientRepository extends Repository {
 
 			fout.close();
 
-			
-			ret = new Pair<File, UUID>(new File(pathToDownloadedFile),
-					UUID.fromString(response.getContent()));
+			ret = new Pair<File, UUID>(new File(pathToDownloadedFile), UUID.fromString(response
+					.getContent()));
 		} catch (ClassNotFoundException e) {
 			System.err.println("Error while reading response");
 		} finally {

@@ -14,13 +14,16 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
 public class ServerRepository extends Repository implements Runnable {
-
 
 	private ServerSocket serverSocket;
 	private int port;
@@ -91,13 +94,14 @@ public class ServerRepository extends Repository implements Runnable {
 		} else if (inMes.getType() == Message.Type.FILEREQUEST) {
 			// file request
 
-			if (inMes.getContent().contains(ClientRepository.getOldFile) && !inMes.getContent().contains(path + foldername)) {
+			if (inMes.getContent().contains(ClientRepository.getOldFile)
+					&& !inMes.getContent().contains(path + foldername)) {
 
 				// Get old commited file
-				
+
 				String[] arr = inMes.getContentArray();
 				String file = arr[1], commit = arr[2];
-				
+
 				sendFile(new File(path + oldCommitsFolderName + file + commit), out, commit);
 
 			} else if (inMes.getContent().contains(path + foldername))
@@ -139,8 +143,14 @@ public class ServerRepository extends Repository implements Runnable {
 				&& inMes.getContent().equals(ClientRepository.getCommitFile)) {
 
 			// Request commits file while checking out
-
-			sendFile(new File(path + foldername + commitsFileName), out, "");
+			Message rMes;
+			try {
+				rMes = new Message(FileUtils.readFileToString(new File(path + foldername
+						+ commitsFileName)), Message.Type.INFO, null);
+				(new ObjectOutputStream(out)).writeObject(rMes);
+			} catch (IOException e) {
+				System.out.println("Error sending commit info (" + e.getMessage() + ")");
+			}
 
 		} else if ((inMes.getType() == Message.Type.INFO)
 				&& inMes.getContentArray()[0].equals(ClientRepository.newCommitMessage)) {
@@ -180,7 +190,19 @@ public class ServerRepository extends Repository implements Runnable {
 
 		String ret = "                 ID                  |              Date             |         Message \n";
 
-		for (Map.Entry<UUID, Commit> entr : commits.entrySet()) {
+		// Make sure we sort the set so we give an ordered overview
+		SortedSet<Map.Entry<UUID, Commit>> sortedEntries = new TreeSet<Map.Entry<UUID, Commit>>(
+				new Comparator<Map.Entry<UUID, Commit>>() {
+
+					@Override
+					public int compare(Map.Entry<UUID, Commit> c1, Map.Entry<UUID, Commit> c2) {
+
+						return c1.getValue().getTime().compareTo(c2.getValue().getTime());
+					}
+				});
+		sortedEntries.addAll(commits.entrySet());
+
+		for (Map.Entry<UUID, Commit> entr : sortedEntries) {
 
 			ret += entr.getKey() + " | " + entr.getValue().getTime().toString() + " | "
 					+ entr.getValue().getMessage() + "\n";
@@ -257,8 +279,8 @@ public class ServerRepository extends Repository implements Runnable {
 				try {
 					// Copy old file
 					if (existingFile.exists())
-						existingFile.renameTo(new File(path + oldCommitsFolderName
-								+ fi + this.files.get(new File(path + fi))));
+						existingFile.renameTo(new File(path + oldCommitsFolderName + fi
+								+ this.files.get(new File(path + fi))));
 					else { // Support for files in folders, by creating these folders
 						existingFile.getParentFile().mkdirs();
 						(new File(path + oldCommitsFolderName + fi)).getParentFile().mkdirs();
@@ -383,22 +405,25 @@ public class ServerRepository extends Repository implements Runnable {
 	/**
 	 * Sends the file over the output stream, also writes the id in a message
 	 * 
-	 * @param f File to send
-	 * @param out Outputstream to send over
-	 * @param id Id to give back, could not be the most recent file so it's not always in our map
+	 * @param f
+	 *            File to send
+	 * @param out
+	 *            Outputstream to send over
+	 * @param id
+	 *            Id to give back, could not be the most recent file so it's not always in our map
 	 */
 	private void sendFile(File f, OutputStream out, String id) {
 
 		InputStream in;
 		try {
 			ObjectOutputStream oOut = new ObjectOutputStream(out);
-			
+
 			// if id is given we don't look it up
-			if(id == null)
+			if (id == null)
 				oOut.writeObject(new Message(files.get(f).toString(), Message.Type.SUCCES, null));
 			else
 				oOut.writeObject(new Message(id, Message.Type.SUCCES, null));
-			
+
 			in = new FileInputStream(f);
 			IOUtils.copy(in, out);
 		} catch (FileNotFoundException e) {

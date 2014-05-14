@@ -1,6 +1,7 @@
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.UUID;
 
@@ -13,6 +14,7 @@ public class Commit {
 	private static final String formStr = "yyyy.MM.dd/HH:mm:ss";
 	private static final SimpleDateFormat form = new SimpleDateFormat(formStr);
 	public static final int lines = 5;
+	
 
 	public Commit(String m, Date t, UUID id) {
 
