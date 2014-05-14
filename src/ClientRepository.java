@@ -17,6 +17,7 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.UUID;
@@ -37,6 +38,8 @@ public class ClientRepository extends Repository {
 	public static final String getOldFile = "getOldFile";
 
 	public static final String fileIdSplit = "##";
+
+	private static final Boolean DEBUG = false;
 
 	// Enums
 	private enum CommitProblems {
@@ -82,7 +85,6 @@ public class ClientRepository extends Repository {
 	 *            Message to add to the commit
 	 * @param filesCommited
 	 *            List of strings, these are the relative paths to the files
-	 *            TODO: fix problem when server is 2 commits behind
 	 */
 	public void addCommit(String message, ArrayList<String> filesCommited) {
 
@@ -169,11 +171,11 @@ public class ClientRepository extends Repository {
 				}
 
 			} catch (Exception e) {
-				System.out
-						.println("Failed to send commit to server, will retry when connection is restored ("
-								+ e.getMessage() + ")");
-				e.printStackTrace();
-				// sendMessageLater(newComMes);
+				System.out.println("Failed to send commit to server, please retry ("
+						+ e.getMessage() + ")");
+				if (DEBUG)
+					e.printStackTrace();
+
 				problem = CommitProblems.CON;
 			}
 
@@ -218,10 +220,13 @@ public class ClientRepository extends Repository {
 			// write to files file
 			writeFilesFile();
 
-			System.out.println("Added commit (" + c.getId() + ")");
+			if (DEBUG)
+				System.out.println("Added commit (" + c.getId() + ")");
 
 		} else if (problem == CommitProblems.CON) {
 			System.out.println("There is a connection problem");
+		} else if (problem == CommitProblems.DIFF) {
+			System.out.println("There is a mismatch, please try updating first");
 		}
 
 	}
@@ -241,18 +246,43 @@ public class ClientRepository extends Repository {
 			// write to remote file
 			createRemoteFile();
 		} catch (UnknownHostException e) {
-			System.err.println("Failed to add this remote (ip: " + ip + ", port: " + port + ")");
+			if (DEBUG)
+				System.err
+						.println("Failed to add this remote (ip: " + ip + ", port: " + port + ")");
 		}
 	}
 
 	/**
 	 * Returns all the files, with the latest commit and whether it's adjusted
+	 * We will get the commits from the server to check if we are behind
 	 * Also returns if a server is saved
 	 * 
 	 * @return String the textual status
 	 */
 	public String status() {
 
+		Map<File, UUID> remoteIds = null;
+
+		if (hasServer) {
+			Message r = null;
+			try {
+				r = sendMessageToRemote(new Message(getLastCommitString, Message.Type.INFO, null));
+			} catch (Exception e) {
+				if (DEBUG)
+					System.out.println("Could not get last commits + " + e.getMessage());
+			}
+
+			remoteIds = new HashMap<File, UUID>();
+			if (r != null) {
+				for (String tuple : r.getContentArray()) {
+					String[] tuple2 = tuple.split(fileIdSplit);
+					String file = tuple2[0];
+					String commitId = tuple2[1];
+
+					remoteIds.put(new File(path + file), UUID.fromString(commitId));
+				}
+			}
+		}
 		String ret = "Current Files in repository: \n";
 		for (Map.Entry<File, UUID> f : files.entrySet()) {
 			File latestFile = new File(path + lastcommitfilesdirname
@@ -261,6 +291,9 @@ public class ClientRepository extends Repository {
 				ret += f.getKey().getAbsolutePath()
 						+ (FileUtils.contentEquals(f.getKey(), latestFile) ? "" : "*")
 						+ " "
+						+ (remoteIds == null ? ""
+								: ((remoteIds.containsKey(f.getKey()) && !remoteIds.get(f.getKey()).equals(f
+										.getValue())) ? "--BEHIND ON SERVER-- " : ""))
 						+ (f.getValue() == null ? "Not commited " : f.getValue() + " "
 								+ commits.get(f.getValue()).getMessage() + " "
 								+ commits.get(f.getValue()).getTime()) + "\n";
@@ -275,17 +308,6 @@ public class ClientRepository extends Repository {
 				: "Not linked to any server";
 
 		return ret;
-	}
-
-	/**
-	 * Delays the sending of message due to a problem
-	 * 
-	 * @param newComMes
-	 *            The message to be send later
-	 */
-	private void sendMessageLater(Message newComMes) {
-
-		// TODO:
 	}
 
 	/**
@@ -378,12 +400,13 @@ public class ClientRepository extends Repository {
 				oldCoFi.getParentFile().mkdirs();
 
 				try {
-					
+
 					oldCoFi.createNewFile();
 					FileUtils.copyFile(ent.getKey(), oldCoFi);
-					
+
 				} catch (IOException e) {
-					System.out.println("Error backing up old files (" + e.getMessage() + ")");
+					if (DEBUG)
+						System.out.println("Error backing up old files (" + e.getMessage() + ")");
 				}
 
 			}
@@ -460,23 +483,31 @@ public class ClientRepository extends Repository {
 	 */
 	public void checkout(String ip, int port) {
 
-		System.out.println("Checkout on ip: " + ip + " and port: " + port);
+		// System.out.println("Checkout on ip: " + ip + " and port: " + port);
 
 		Message mes = new Message(getCheckOutString, Message.Type.INFO, null);
 		try {
-			// Can throw a parse exception
-			addRemote(ip, port);
+
+			if (!hasServer)
+				// Can throw a parse exception
+				addRemote(ip, port);
+			else {
+				this.serverIP = InetAddress.getByName(ip);
+				this.serverPort = port;
+			}
 
 			// Send messageInetAddress ip = InetAddress.getByName(args[0]);
 			Message response = sendMessageToRemote(mes);
 
-			System.out.println("Got response from server, start downloading files!");
+			if (DEBUG)
+				System.out.println("Got response from server, start downloading files!");
 
 			// Process message response
 			if (response.getType() == Message.Type.INFO) {
 				for (String file : response.getContentArray()) {
 
-					System.out.println("Downloading file " + file);
+					if (DEBUG)
+						System.out.println("Downloading file " + file);
 
 					// loads file into repo and then copies to the working dir
 					File newFile = new File(path + file);
@@ -486,7 +517,7 @@ public class ClientRepository extends Repository {
 					// add file to files list
 					files.put(newFile, p.getB());
 				}
-				
+
 				writeFilesFile();
 
 				// Update commits
@@ -522,7 +553,7 @@ public class ClientRepository extends Repository {
 	public void checkout() {
 
 		if (hasServer)
-			checkout(serverIP.toString(), serverPort);
+			checkout(serverIP.getHostAddress(), serverPort);
 		else
 			System.out.println("Add a remote first");
 	}
@@ -583,8 +614,8 @@ public class ClientRepository extends Repository {
 			Message response;
 
 			try {
-				// TODO:delete
-				System.out.println("Sending Message (" + mes.getContent() + ")");
+				if (DEBUG)
+					System.out.println("Sending Message (" + mes.getContent() + ")");
 
 				InputStream rawInput = socket.getInputStream();
 				OutputStream rawOutput = socket.getOutputStream();
@@ -658,8 +689,6 @@ public class ClientRepository extends Repository {
 
 			}
 
-			// oOut.close();
-
 			// do not open if can't collect something
 			ObjectInputStream oIn = new ObjectInputStream(in);
 			try {
@@ -668,7 +697,8 @@ public class ClientRepository extends Repository {
 				if (response.getType() != Message.Type.SUCCES)
 					throw new Exception("Something went wrong on the server!");
 			} catch (ClassNotFoundException e) {
-				System.err.println("Could not read response (" + e.getMessage() + ")");
+				if (DEBUG)
+					System.err.println("Could not read response (" + e.getMessage() + ")");
 			}
 
 			// socket.close();
@@ -704,7 +734,8 @@ public class ClientRepository extends Repository {
 			try {
 				remoteFile.createNewFile();
 			} catch (IOException e1) {
-				System.out.println("Error creating remote file!");
+				if (DEBUG)
+					System.out.println("Error creating remote file!");
 			}
 
 		// Write information to it
@@ -717,7 +748,8 @@ public class ClientRepository extends Repository {
 			output.newLine();
 			output.close();
 		} catch (IOException e) {
-			System.err.println("Something went wrong writing remote files");
+			if (DEBUG)
+				System.err.println("Something went wrong writing remote files");
 		}
 	}
 
@@ -754,10 +786,10 @@ public class ClientRepository extends Repository {
 				pathToDownloadedFile = path + lastcommitfilesdirname + filename;
 			else
 				pathToDownloadedFile = path + oldCommitsFolderName + filename + id.toString();
-			
+
 			// Create folders if they are not there yet
 			(new File(pathToDownloadedFile)).getParentFile().mkdirs();
-			
+
 			FileOutputStream fout = new FileOutputStream(pathToDownloadedFile);
 
 			ObjectOutputStream out = new ObjectOutputStream(rawOutput);
@@ -775,7 +807,8 @@ public class ClientRepository extends Repository {
 			ret = new Pair<File, UUID>(new File(pathToDownloadedFile), UUID.fromString(response
 					.getContent()));
 		} catch (ClassNotFoundException e) {
-			System.err.println("Error while reading response");
+			if (DEBUG)
+				System.err.println("Error while reading response");
 		} finally {
 			socket.close();
 		}

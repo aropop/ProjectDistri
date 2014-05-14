@@ -157,11 +157,11 @@ public class ClientMain {
 
 					System.out.println(cr.status());
 
-				}else if (command.equals("test")) {
+				} else if (command.equals("update")) {
 
-					// Status command
+					// Update command
 
-			
+					cr.update();
 					
 
 				} else if (command.equals("list-commits")) {
