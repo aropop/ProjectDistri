@@ -1,3 +1,5 @@
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Scanner;
 
@@ -11,7 +13,8 @@ public class ClientMain {
 			+ "* diff file commitId (otherCommitId) => Shows a diff of the file with the head or if given an other commit\n"
 			+ "* list-commits                       => Lists the commits on the server\n"
 			+ "* status                             => Gives an overview of the state of your repository\n"
-			+ "* help                               => Shows this help";
+			+ "* help                               => Shows this help"
+			+ "* exit                               => Leaves the version control";
 
 	/**
 	 * @param args
@@ -149,6 +152,13 @@ public class ClientMain {
 					// Status command
 
 					System.out.println(cr.status());
+
+				}else if (command.equals("test")) {
+
+					// Status command
+
+			
+					
 
 				} else if (command.equals("list-commits")) {
 					// Return a list of all the commits with it's files and date

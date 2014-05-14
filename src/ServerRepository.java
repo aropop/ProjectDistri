@@ -259,6 +259,10 @@ public class ServerRepository extends Repository implements Runnable {
 					if (existingFile.exists())
 						existingFile.renameTo(new File(path + oldCommitsFolderName
 								+ fi + this.files.get(new File(path + fi))));
+					else { // Support for files in folders, by creating these folders
+						existingFile.getParentFile().mkdirs();
+						(new File(path + oldCommitsFolderName + fi)).getParentFile().mkdirs();
+					}
 
 					FileOutputStream fout = new FileOutputStream(path + lastcommitfilesdirname + fi);
 
@@ -272,7 +276,7 @@ public class ServerRepository extends Repository implements Runnable {
 							+ fi));
 
 				} catch (FileNotFoundException e) {
-					System.err.println("Error surrounding file system");
+					System.err.println("Error surrounding file system (" + e.getMessage() + ")");
 					sendError("FILE SYSTEM ERR", out);
 				} catch (IOException e) {
 					System.out.println("IO exception: " + e.getMessage());
