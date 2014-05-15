@@ -8,8 +8,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.UUID;
 
 /**
@@ -196,6 +194,25 @@ public abstract class Repository {
 		} catch (IOException e) {
 			System.err.println("Error: Opening file file");
 		}
+	}
+	
+	
+	/**
+	 * Getter for the path of this repository
+	 * @return String path
+	 */
+	public String getPath(){
+		return this.path;
+	}
+	
+	
+	/**
+	 * Returns the name of the folder where information is stored about the repository
+	 * this should be excluded from a list
+	 * @return
+	 */
+	public static String getExcludeName(){
+		return foldername.substring(0, foldername.length() - 1);
 	}
 
 }
