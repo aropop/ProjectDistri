@@ -65,7 +65,7 @@ public class ServerRepository extends Repository implements Runnable {
 				Message inMes = (Message) in.readObject();
 
 				System.out.println("Got Message (" + inMes.getContent() + ")");
-				
+
 				// Multithreading
 				ServerCall sc = new ServerCall(inMes, in, out);
 				Thread t = new Thread(sc);
@@ -176,20 +176,34 @@ public class ServerRepository extends Repository implements Runnable {
 				}
 
 			} else if ((inMes.getType() == Message.Type.INFO)
-					&& inMes.getContentArray()[0].equals(ClientRepository.newCommitMessage)) {
-
-				// Add the commit
-				Commit newCom = new Commit(null, null, null);
-				newCom.readFromString(new ArrayList<String>(
-						Arrays.asList(inMes.getContentArray()[1].split("\n"))));
-				addCommit(newCom, in, out, Arrays.copyOfRange(	inMes.getContentArray(), 2,
-																inMes.getContentArray().length));
-
-			} else if ((inMes.getType() == Message.Type.INFO)
 					&& inMes.getContentArray()[0].equals(ClientRepository.getLastCommitString)) {
 
-				// Send the last files including their latest id
-				sendLatestCommitString(out);
+				try {
+					ObjectOutputStream oout = new ObjectOutputStream(out);
+
+					// Send the last files including their latest id and after we can have a commit
+					sendLatestCommitString(oout);
+
+					// There is more to read, if client closes it will throw an exception
+					inMes = (Message) in.readObject();
+
+					// Add the commit
+					Commit newCom = new Commit(null, null, null);
+					newCom.readFromString(new ArrayList<String>(Arrays.asList(inMes
+							.getContentArray()[1].split("\n"))));
+					addCommit(	newCom,
+								in,
+								oout,
+								Arrays.copyOfRange(	inMes.getContentArray(), 2,
+													inMes.getContentArray().length));
+
+				} catch (IOException e) {
+					// Readobject throws a IOException null if the client closes, we are not interested in that
+					if(e.getMessage() != null)
+						System.err.println("IO excpetion: " + e.getMessage());
+				} catch (ClassNotFoundException e) {
+					System.err.println("Cannot read class: " + e.getMessage());
+				}
 
 			} else {
 				System.err.println("Unknown Message, sending error");
@@ -249,7 +263,7 @@ public class ServerRepository extends Repository implements Runnable {
 
 		}
 
-		private void sendLatestCommitString(OutputStream out) {
+		private void sendLatestCommitString(ObjectOutputStream out) {
 
 			String mesCont = "";
 			String sep = "&&";
@@ -269,11 +283,9 @@ public class ServerRepository extends Repository implements Runnable {
 			else
 				mes = new Message("", Message.Type.INFO, null);
 
-			ObjectOutputStream oo;
 			try {
-				oo = new ObjectOutputStream(out);
-				oo.writeObject(mes);
-				oo.flush();
+				out.writeObject(mes);
+				out.flush();
 			} catch (IOException e) {
 				System.err.println("Error while sending latest commit string");
 				sendError("ERROR IO", out);
@@ -288,7 +300,7 @@ public class ServerRepository extends Repository implements Runnable {
 		 * @param inMes
 		 *            Message contains filenames and sizes
 		 */
-		private void recieveFiles(InputStream in, OutputStream out, String[] fileNamesAndSizes) {
+		private void recieveFiles(InputStream in, ObjectOutputStream out, String[] fileNamesAndSizes) {
 
 			// Make and fill each files
 			for (String fiAndSize : fileNamesAndSizes) {
@@ -379,7 +391,7 @@ public class ServerRepository extends Repository implements Runnable {
 		 * 
 		 * @see Repository#addCommit(Commit)
 		 */
-		public synchronized void addCommit(Commit c, InputStream in, OutputStream out,
+		private synchronized void addCommit(Commit c, InputStream in, ObjectOutputStream out,
 				String[] filesAndSizes) {
 
 			// Update files
@@ -418,9 +430,8 @@ public class ServerRepository extends Repository implements Runnable {
 			Message response = new Message("Succes", Message.Type.SUCCES, null);
 
 			try {
-				ObjectOutputStream oout = new ObjectOutputStream(out);
-				oout.writeObject(response);
-				oout.flush();
+				out.writeObject(response);
+				out.flush();
 
 			} catch (IOException e) {
 				sendError("RESPONSE ERROR", out);

@@ -124,15 +124,30 @@ public class ClientRepository extends Repository {
 		CommitProblems problem = CommitProblems.NONE;
 		ArrayList<String> filesWithDiff = new ArrayList<String>();
 
+		// Initialise input & output stream
+		ObjectOutputStream outToServ = null;
+		ObjectInputStream inToServ = null;
+
 		// Check with server and update it
 		if (hasServer) {
 
 			try {
 
+				// Give a value to in and out
+				Socket s = getSocket();
+				outToServ = new ObjectOutputStream(s.getOutputStream());
+
 				// check if there is not interference between commits
 				Message checkLatestCommit = new Message(getLastCommitString, Message.Type.INFO,
 						null);
-				Message fileList = sendMessageToRemote(checkLatestCommit);
+
+				// Since the addcommit should happen as a transaction, we cannot use
+				// sendMessageToRemote
+				outToServ.writeObject(checkLatestCommit);
+
+				// Recieve message
+				inToServ = new ObjectInputStream(s.getInputStream());
+				Message fileList = (Message) inToServ.readObject();
 
 				// when no file list is returned (no files in server repository)
 				if (fileList.getContent().length() != 0) {
@@ -166,8 +181,13 @@ public class ClientRepository extends Repository {
 				// the server
 				if (problem == CommitProblems.NONE) {
 
-					sendFilesAndCommitToServer(c);
+					sendFilesAndCommitToServer(c, outToServ, inToServ);
 
+				} else{
+					
+					outToServ.close();
+					inToServ.close();
+					
 				}
 
 			} catch (Exception e) {
@@ -292,8 +312,8 @@ public class ClientRepository extends Repository {
 						+ (FileUtils.contentEquals(f.getKey(), latestFile) ? "" : "*")
 						+ " "
 						+ (remoteIds == null ? ""
-								: ((remoteIds.containsKey(f.getKey()) && !remoteIds.get(f.getKey()).equals(f
-										.getValue())) ? "--BEHIND ON SERVER-- " : ""))
+								: ((remoteIds.containsKey(f.getKey()) && !remoteIds.get(f.getKey())
+										.equals(f.getValue())) ? "--BEHIND ON SERVER-- " : ""))
 						+ (f.getValue() == null ? "Not commited " : f.getValue() + " "
 								+ commits.get(f.getValue()).getMessage() + " "
 								+ commits.get(f.getValue()).getTime()) + "\n";
@@ -647,63 +667,47 @@ public class ClientRepository extends Repository {
 	 * @param filesCommited
 	 * @throws Exception
 	 */
-	private void sendFilesAndCommitToServer(Commit c) throws Exception {
+	private void sendFilesAndCommitToServer(Commit c, ObjectOutputStream out, ObjectInputStream in)
+			throws Exception {
 
-		Socket socket = getSocket();
+		String globSplit = "&&";
 
-		if (socket == null) {
+		// Make a list with the sizes
+		String fileList = "";
+		for (String f : c.getFiles()) {
+			File actualFile = new File(path + f);
+			fileList += f + "&" + actualFile.length() + globSplit;
+		}
 
-			throw new ConnectException("Could not connect to remote!");
+		// Create the message
+		Message sendCommit = new Message(newCommitMessage + globSplit + c.writeToString()
+				+ globSplit + fileList.substring(0, fileList.length() - globSplit.length()),
+				Message.Type.INFO, globSplit);
 
-		} else {
+		// Add the Files
+		out.writeObject(sendCommit);
+		out.flush();
 
-			OutputStream out = socket.getOutputStream();
-			InputStream in = socket.getInputStream();
-			ObjectOutputStream oOut = new ObjectOutputStream(out);
+		for (String f : c.getFiles()) {
 
-			String globSplit = "&&";
+			File file = new File(path + f);
+			InputStream inF = new FileInputStream(file);
+			IOUtils.copy(inF, out);
 
-			// Make a list with the sizes
-			String fileList = "";
-			for (String f : c.getFiles()) {
-				File actualFile = new File(path + f);
-				fileList += f + "&" + actualFile.length() + globSplit;
-			}
-
-			// Create the message
-			Message sendCommit = new Message(newCommitMessage + globSplit + c.writeToString()
-					+ globSplit + fileList.substring(0, fileList.length() - globSplit.length()),
-					Message.Type.INFO, globSplit);
-
-			// Add the Files
-			oOut.writeObject(sendCommit);
-			oOut.flush();
-
-			for (String f : c.getFiles()) {
-
-				File file = new File(path + f);
-				InputStream inF = new FileInputStream(file);
-				IOUtils.copy(inF, oOut);
-
-				oOut.flush();
-
-			}
-
-			// do not open if can't collect something
-			ObjectInputStream oIn = new ObjectInputStream(in);
-			try {
-				Message response = (Message) oIn.readObject();
-
-				if (response.getType() != Message.Type.SUCCES)
-					throw new Exception("Something went wrong on the server!");
-			} catch (ClassNotFoundException e) {
-				if (DEBUG)
-					System.err.println("Could not read response (" + e.getMessage() + ")");
-			}
-
-			// socket.close();
+			out.flush();
 
 		}
+
+		try {
+			Message response = (Message) in.readObject();
+
+			if (response.getType() != Message.Type.SUCCES)
+				throw new Exception("Something went wrong on the server!");
+		} catch (ClassNotFoundException e) {
+			if (DEBUG)
+				System.err.println("Could not read response (" + e.getMessage() + ")");
+		}
+
 	}
 
 	/**
