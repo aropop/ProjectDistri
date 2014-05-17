@@ -1,0 +1,69 @@
+% !TeX spellcheck = nl_BE
+\documentclass{article}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{listings}
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+\newcommand{\thedate}{21 Mei 2014}
+\newcommand{\projectname}{ProjectGedistribueerdeSystemen-ArnoDeWitte-15_05_214}
+\title{Codeverslag Project Gedistribueerde Systemen}
+\author{Arno De Witte\\
+Vrije Universiteit Brussel}
+\date{21 Mei 2014}
+\begin{document}
+
+
+\begin{titlepage}
+\begin{center}
+
+\includegraphics[width=0.60\textwidth]{./VUB_logo_compact.jpg}~\\[1cm]
+
+
+\textsc{\Large Gedistribueerde Systemen}\\[0.5cm]
+
+% Title
+\HRule \\[0.4cm]
+{ \huge \bfseries Codeverslag Project}\\[0.4cm]
+
+\HRule \\[1.5cm]
+
+% Author and supervisor
+\begin{minipage}{0.4\textwidth}
+\begin{flushleft} \large
+Arno \textsc{De Witte}\\
+\end{flushleft}
+\end{minipage}
+\begin{minipage}{0.5\textwidth}
+\begin{flushright} \large
+\emph{Docent:}\\ Prof. Dr. Tom Van Cutsem\\
+\emph{Assistent:}\\ Laure Philips
+\end{flushright}
+\end{minipage}
+
+\vfill
+
+% Bottom of the page
+{\large \thedate}
+
+\end{center}
+\end{titlepage}
+
+%\maketitle
+\newpage
+\tableofcontents
+\newpage
+
+
+\section{Inleiding}\label{inleiding}
+De opdracht van het project voor het vak Gedistribueerde Systemen was om een versiebeheersysteem te maken. Er moesten enkele basis commando's worden ge\"{i}mplementeerd waaronder checkout, commit en andere. Dit moest gebeuren in Java en op het TCP/IP protocol. Er moest een eigen protocol worden ontwikkelt om tussen client en server te kunnen communiceren.
+
+\section{Testen}\label{test}
+\subsection{Compileren}
+Om de bestanden te compileren moet je het volgende commando uitvoeren:
+\lstinputlisting{./compile.sh}
+Of je kan de meegeleverde file \emph{compile.sh} uitvoeren. Dit zal in de folder waarin je de commando's uitvoert of waarin je het script uitvoert, klasse bestanden genereren.
+\subsection{Uitvoeren}
+Om de client uit te voeren moet je 
+
+
+\end{document}
