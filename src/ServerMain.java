@@ -1,12 +1,6 @@
 import java.util.ArrayList;
 
 
-/**
- * @author Arno De Witte
- *
- * Main class for the server, from here we can start multiple server repositories
- *
- */
 public class ServerMain {
 	
 	private static final int startPort = 12345;

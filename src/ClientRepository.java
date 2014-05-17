@@ -24,12 +24,6 @@ import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
-/**
- * @author Arno De Witte
- * 
- * Class that represents a single client repository
- *
- */
 public class ClientRepository extends Repository {
 
 	// Constants
@@ -69,8 +63,6 @@ public class ClientRepository extends Repository {
 	public ClientRepository(String path) throws Exception {
 
 		super(path);
-
-		// Check if the remote file exists and then add the remote if so
 		File remote = new File(this.path + foldername + remoteFileName);
 		if (remote.exists()) {
 			hasServer = true;
@@ -191,11 +183,11 @@ public class ClientRepository extends Repository {
 
 					sendFilesAndCommitToServer(c, outToServ, inToServ);
 
-				} else {
-
+				} else{
+					
 					outToServ.close();
 					inToServ.close();
-
+					
 				}
 
 			} catch (Exception e) {
@@ -209,7 +201,6 @@ public class ClientRepository extends Repository {
 
 		}
 
-		// If there is no problem we can actually commit this commit
 		if (problem == CommitProblems.NONE) {
 
 			// Add commit to commits map
@@ -292,7 +283,6 @@ public class ClientRepository extends Repository {
 
 		Map<File, UUID> remoteIds = null;
 
-		// If we have a server we check if we are behind
 		if (hasServer) {
 			Message r = null;
 			try {
@@ -302,7 +292,6 @@ public class ClientRepository extends Repository {
 					System.out.println("Could not get last commits + " + e.getMessage());
 			}
 
-			// Get the files and ids in a map
 			remoteIds = new HashMap<File, UUID>();
 			if (r != null) {
 				for (String tuple : r.getContentArray()) {
@@ -314,8 +303,6 @@ public class ClientRepository extends Repository {
 				}
 			}
 		}
-
-		// Build the list of files
 		String ret = "Current Files in repository: \n";
 		for (Map.Entry<File, UUID> f : files.entrySet()) {
 			File latestFile = new File(path + lastcommitfilesdirname
@@ -336,7 +323,6 @@ public class ClientRepository extends Repository {
 
 		}
 
-		// Check if there is a server connected
 		ret += hasServer ? "Linked to server at " + serverIP.getHostAddress() + " on port "
 				+ serverPort + (heartBeat() ? " which is online" : " and is down")
 				: "Not linked to any server";
@@ -419,10 +405,6 @@ public class ClientRepository extends Repository {
 		return ret.substring(0, ret.length() - 1);
 	}
 
-	/**
-	 * Performs the update command, which is a mirror of the checkout command only do we save the
-	 * older committed files so when we ask for a diff we don't have to transfer them
-	 */
 	public void update() {
 
 		// Can't update if we are not connected
@@ -643,7 +625,6 @@ public class ClientRepository extends Repository {
 
 		Socket socket = getSocket();
 
-		// Check if we do in fact have a connection
 		if (socket == null) {
 
 			throw new ConnectException("Could not connect to remote!");

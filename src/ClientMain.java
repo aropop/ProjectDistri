@@ -1,4 +1,3 @@
-import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -7,16 +6,14 @@ import java.util.Scanner;
 public class ClientMain {
 
 	private static final String helpText = "Commands\n"
-			+ "* add (-m \"message\") <files>         => Adds files to the repository\n"
-			+ "* add-remote ip port                 => Adds a remote to the repository\n"
+			+ "* add (-m \"message\") <files>         => Adds files to the repository\n"   
+			+ "* add-remote ip port                 => Adds a remote to the repository\n" 
 			+ "* checkout (ip port)                 => Checksout from a remote\n"
 			+ "* commit (-m \"message\") <files>      => Commits files with a optional message\n"
 			+ "* diff file commitId (otherCommitId) => Shows a diff of the file with the head or if given an other commit\n"
 			+ "* list-commits                       => Lists the commits on the server\n"
 			+ "* status                             => Gives an overview of the state of your repository\n"
-			+ "* open file                          => Opens the file in the repository\n"
-			+ "* list (subdir)                      => lists the files in the directory, when subdir is given it will list in a subdirectory\n"
-			+ "* help                               => Shows this help\n"
+			+ "* help                               => Shows this help"
 			+ "* exit                               => Leaves the version control";
 
 	/**
@@ -84,13 +81,13 @@ public class ClientMain {
 
 					// Checkout command
 
-					if (scl.hasNext()) {
+					if (scl.hasNext()){
 						String ip = scl.next();
-						if (scl.hasNextInt())
+						if(scl.hasNextInt())
 							cr.checkout(ip, scl.nextInt());
 						else
 							printHelp();
-					} else
+					}else
 						cr.checkout();
 
 				} else if (command.equals("commit")) {
@@ -127,31 +124,32 @@ public class ClientMain {
 				} else if (command.equals("diff")) {
 
 					// Diff command
-
+					
 					String file, cid1, cid2;
-					if (scl.hasNext()) {
-
+					if(scl.hasNext()){
+						
 						file = scl.next();
-
-						if (scl.hasNext()) {
-
+						
+						if(scl.hasNext()){
+							
 							cid1 = scl.next();
-
-							if (scl.hasNext()) {
-
+							
+							if(scl.hasNext()){
+								
 								// 2 commit ids given
 								cid2 = scl.next();
 								System.out.println(cr.diff(file, cid1, cid2));
-
-							} else {
+										
+							}else{
 								// Only 1 id given so with current head
 								System.out.println(cr.diff(file, cid1, null));
-
+								
 							}
 						} else
 							printHelp();
-					} else
+					}else
 						printHelp();
+						
 
 				} else if (command.equals("status")) {
 
@@ -159,48 +157,12 @@ public class ClientMain {
 
 					System.out.println(cr.status());
 
-				} else if (command.equals("open")) {
-
-					// Open command
-
-					if (scl.hasNext())
-						try {
-							Desktop.getDesktop().open(new File(cr.getPath() + scl.next()));
-						} catch (IOException e) {
-							System.out.println("Could not open that file!");
-						}
-					else
-						System.out.println("Please specify a file");
-
 				} else if (command.equals("update")) {
 
 					// Update command
 
 					cr.update();
-
-				} else if (command.equals("list")) {
-
-					// List command
-
-					String path = cr.getPath() + (cr.getPath().endsWith("/") ? "" : "/");
-
-					if (scl.hasNext()) {
-						String subdr = scl.next();
-						path += (subdr.startsWith("/") ? subdr.substring(1) : (subdr
-								.startsWith("./") ? subdr.substring(2) : subdr));
-					}
-
-					File folder = new File(path);
-					File[] filesInfolder = folder.listFiles();
-
-					for (File f : filesInfolder) {
-						if (f.isDirectory()) {
-							if (!f.getName().equals(Repository.getExcludeName()))
-								System.out.println(f.getName() + "/");
-
-						} else
-							System.out.println(f.getName());
-					}
+					
 
 				} else if (command.equals("list-commits")) {
 					// Return a list of all the commits with it's files and date

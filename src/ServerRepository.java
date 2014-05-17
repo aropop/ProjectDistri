@@ -15,6 +15,7 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -22,25 +23,20 @@ import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
-/**
- * @author Arno De Witte
- * 
- * Class that represents a single server repository
- *
- */
 public class ServerRepository extends Repository implements Runnable {
 
 	private ServerSocket serverSocket;
 	private int port;
 
 	/**
-	 * @param path
-	 *            We support different repositories in different paths
+	 * @param user
+	 *            Identifies which user wants to use this repository, so we can
+	 *            track who changed stuff
 	 * @throws Exception
 	 */
-	public ServerRepository(String path, int port) throws Exception {
+	public ServerRepository(String user, int port) throws Exception {
 
-		super(path);
+		super(user);
 
 		// Manage Connection
 		this.port = port;
@@ -84,11 +80,6 @@ public class ServerRepository extends Repository implements Runnable {
 		}
 	}
 
-	/**
-	 * Class contains all the actions performed in a single server call. It's in a different class
-	 * so we can make a different thread out of it.
-	 * 
-	 */
 	class ServerCall implements Runnable {
 
 		private Message inMes;
@@ -190,12 +181,25 @@ public class ServerRepository extends Repository implements Runnable {
 				try {
 					ObjectOutputStream oout = new ObjectOutputStream(out);
 
-					handlePossibleCommit(oout);
+					// Send the last files including their latest id and after we can have a commit
+					sendLatestCommitString(oout);
+
+					// There is more to read, if client closes it will throw an exception
+					inMes = (Message) in.readObject();
+
+					// Add the commit
+					Commit newCom = new Commit(null, null, null);
+					newCom.readFromString(new ArrayList<String>(Arrays.asList(inMes
+							.getContentArray()[1].split("\n"))));
+					addCommit(	newCom,
+								in,
+								oout,
+								Arrays.copyOfRange(	inMes.getContentArray(), 2,
+													inMes.getContentArray().length));
 
 				} catch (IOException e) {
-					// Readobject throws a IOException null if the client closes, we are not
-					// interested in that
-					if (e.getMessage() != null)
+					// Readobject throws a IOException null if the client closes, we are not interested in that
+					if(e.getMessage() != null)
 						System.err.println("IO excpetion: " + e.getMessage());
 				} catch (ClassNotFoundException e) {
 					System.err.println("Cannot read class: " + e.getMessage());
@@ -259,40 +263,6 @@ public class ServerRepository extends Repository implements Runnable {
 
 		}
 
-		/**
-		 * Handles the event where the client asks for the latest commits, this may indicate that a
-		 * commit will follow. However when there is a conflict and the sending of the commit is
-		 * aborted the client will close the stream.
-		 * This is a synchronized void to prevent 2 clients getting the same list and both sending
-		 * the commit.
-		 * 
-		 * @param oout
-		 * @throws IOException
-		 * @throws ClassNotFoundException
-		 */
-		private synchronized void handlePossibleCommit(ObjectOutputStream oout) throws IOException,
-				ClassNotFoundException {
-
-			// Send the last files including their latest id and after we can have a commit
-			sendLatestCommitString(oout);
-
-			// There is more to read, if client closes it will throw an exception
-			inMes = (Message) in.readObject();
-
-			// Add the commit
-			Commit newCom = new Commit(null, null, null);
-			newCom.readFromString(new ArrayList<String>(Arrays.asList(inMes.getContentArray()[1]
-					.split("\n"))));
-			addCommit(newCom, in, oout, Arrays.copyOfRange(	inMes.getContentArray(), 2,
-															inMes.getContentArray().length));
-		}
-
-		/**
-		 * Writes a Message over the output stream with content being a list of files and their
-		 * latest commit
-		 * 
-		 * @param out
-		 */
 		private void sendLatestCommitString(ObjectOutputStream out) {
 
 			String mesCont = "";
@@ -376,12 +346,6 @@ public class ServerRepository extends Repository implements Runnable {
 			}
 		}
 
-		/**
-		 * Sends a Message object over the outputstream. The content will be the mes string
-		 * 
-		 * @param mes
-		 * @param out
-		 */
 		private void sendError(String mes, OutputStream out) {
 
 			Message m = new Message(mes, Message.Type.ERROR, null);
@@ -422,14 +386,10 @@ public class ServerRepository extends Repository implements Runnable {
 			}
 		}
 
-
-		/**
-		 * Performs the actual adding of a commit
+		/*
+		 * (non-Javadoc)
 		 * 
-		 * @param c The commit object to be added
-		 * @param in
-		 * @param out
-		 * @param filesAndSizes Array of tuples that contain the file name and size of the file
+		 * @see Repository#addCommit(Commit)
 		 */
 		private synchronized void addCommit(Commit c, InputStream in, ObjectOutputStream out,
 				String[] filesAndSizes) {
@@ -462,7 +422,7 @@ public class ServerRepository extends Repository implements Runnable {
 
 			System.out.println("Updated files");
 
-			// Receive files after a commit
+			// Recieve files after a commit
 			recieveFiles(in, out, filesAndSizes);
 
 			System.out.println("Recieved Files, sending response");
