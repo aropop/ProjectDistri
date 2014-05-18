@@ -57,13 +57,79 @@ Arno \textsc{De Witte}\\
 \section{Inleiding}\label{inleiding}
 De opdracht van het project voor het vak Gedistribueerde Systemen was om een versiebeheersysteem te maken. Er moesten enkele basis commando's worden ge\"{i}mplementeerd waaronder checkout, commit en andere. Dit moest gebeuren in Java en op het TCP/IP protocol. Er moest een eigen protocol worden ontwikkelt om tussen client en server te kunnen communiceren.
 
+\section{Overzicht}
+\label{sec:overzicht}
+Mijn versiebeheersysteem bestaat uit twee delen. Je hebt de client waar je als gebruiker zelf commando's aan meegeeft. Aan de andere kant heb je de server. Deze moet enkel worden opgestart en functioneert daarna volledig autonoom aan de hand van clients die berichten sturen.\\
+Beide delen van het systeem slaan hun informatie op in een verborgen map (.vc) die zich in de root van pad van het repository bevindt. Hierin wordt bijvoorbeeld de commits in opgeslagen, alsook de laatst commited versie van een bestand.\\
+Er is gekozen om voor elke commit een apart bestand bij te houden. Dit gebeurt op de server. De server bezit dus voor elk bestand al de oudere commits. Er wordt dus niet gewerkt met delta's waar enkel verschillen worden bijgehouden.\\
+Verder ondersteunt dit systeem ook mappen. Dit wil zeggen dat je in het pad waarin je je repository hebt ge\"{i}nitialiseerd, mappen kan hebben met daarin bestanden. Al je bestanden hoeven dus niet in de root van je map te staan.\\
+De server is ook multithreaded. Dit wil zeggen dat hij op verschillende clients tegelijkertijd kan antwoorden. Hierbij is rekening gehouden met de integriteit van het systeem. Er kunnen bijvoorbeeld geen twee commits op hetzelfde moment worden afgehandeld.
+% section overzicht (end)
+
+\section{Klasse overzicht}
+\label{sec:klasoverzicht}
+Dit project is opgedeeld in verschillende klassen. Deze worden hieronder kort besproken.\\
+
+\textbf{ClientMain} is de klasse waarmee de client gestart wordt. Ze heeft enkel de main procedure en een hulp functie om een help tekst uit te printen. In de main procedure wordt een read-eval-print loop gestart. Er wordt telkens een commando van de standaard input gelezen. Dit wordt meegegeven aan de client repository\footnote{Sommige commando's zoals open en list gebruiken de repository enkel om het pad te vragen} en die gaat het commando dan verwerken.\\
+
+\textbf{Repository} is de abstracte klasse waarvan de clientrepository\ref{cr} en serverrepository\ref{sr} overerven. Deze bevat een constructor die voor zowel de twee kinderen dezelfde is. Deze gaat na of de repository al eens is gestart in het meegegeven pad. Dit wilt zeggen dat de verbogen map al is aangemaakt. Als dit het geval is roept het de procedure \underline{readFromDir} op. Deze leest de opgeslagen informatie in.\\
+Als de map nog niet is aangemaakt, zal de constructor deze zelf aanmaken. Dit gebeurt aan de hand van de \underline{createFolder} procedure. Inclusief alle bestanden waarin informatie wordt opgeslagen. In de map bevinden zich 2 bestanden 'files' en 'commits'. De eerste bevat alle bestanden in de repository samen met hun laatste commit, de tweede bevat alle commits.\\
+De Repository heeft ook nog een getter voor het pad (\underline{getPath}) en een hulpprocedure die het files bestand wegschrijft (\underline{writeFilesFile}).\\
+Als eigenschappen heeft de repository een pad waarin de repository zich bevindt, een map met bestanden die als waarde de laatste commitid hebben. Als laatste heeft het ook nog een map met commitId als sleutel en als waardes de commit\ref{commit} objecten zelf.\\
+
+\textbf{ClientRepository}\label{cr}
+Deze klasse stelt ontvangt alle commando's van de client. De klasse heeft als extra eigenschappen een IP en poort voor een server. Hieronder een overzicht van de belangrijkste procedures.\\
+\underline{add-remote} gaat een server toevoegen aan de repository.\\
+\underline{addFile} voegt een bestand toe aan de commit.\\
+\underline{addCommit} gaat een nieuwe commit toevoegen. Hiervoor wordt eerst een lijst met bestanden en hun laatste commit opgevraagd. Zo kan er worden nagegaan of er geen conflict optreed bij het toepassen van de commit. Als er geen probleem is wordt de commit samen met zijn bestanden doorgestuurd naar de server.\\
+\underline{checkout} kopieert alle bestanden en commits van een server. Deze kan worden meegegeven anders wordt de huidige server gebruikt.\\
+\underline{status} geeft een overzicht van de repository. Het geeft een overzicht van alle bestanden, of deze bestanden aangepast zijn sinds de laatste commit en of deze commit achter de server zit.\\
+\underline{update} doet hetzelfde als checkout maar gaat ervan uit dat de repository al is ge\"{i}nitialiseerd is. Het gaat de bestaande bestanden opslaan in de oldCommits map opslaan. Zodat wanneer er een diff wordt uitgevoerd het oude bestand niet moet worden opgevraagd.\\
+\underline{diff} geeft de verschillen van een bestand tussen 2 commits weer. Hiervoor vraagt kijkt het of het dit oude bestand niet lokaal heeft. Als dit niet het geval is gaat het dit bestand opvragen aan de server\\
+\underline{listCommits} vraagt aan de server een lijst met alle commits. \\
+\underline{sendMessageToRemote} verstuurt een Message\ref{message} object naar de server.\\
+\underline{requestFile} gaat een bestand aan de server vragen.\\
+\\
+\textbf{ServerRepository}\label{sr} 
+Deze klasse implementeert Runnable omdat er zo meerdere serverrepository's op hetzelfde moment kunnen worden aangemaakt. Verder bevat ze nog een subklasse ServerCall. Deze implementeert ook Runnable zo kunnen er meerdere oproepen van clients op hetzelfde moment worden afgehandeld.\\
+\underline{messageDispatch} neemt een bericht van de client en zorgt ervoor dat de juiste procedures worden opgeroepen.\\
+\underline{handlePossibleCommit} zorgt ervoor dat wanneer er een lijst met bestanden en commits wordt opgevraagd, dit gevolgd wordt door een toevoeging van een commit. Wanneer dit het geval is wordt de commit toegevoegd. In het andere geval sluit de procedure de connectie. Er is dan waarschijnlijk een conflict op de client. Dit moet door 1 synchrone procedure worden afgehandeld om de integriteit van het systeem te garanderen.\\
+\underline{addCommit} voegt de commit toe wanneer ze door kan gaan.\\
+\underline{buildListOfCommits} schrijft een gesorteerde lijst van commits over de connectie in de vorm van een string.\\
+\underline{sendCheckout} stuurt een lijst van files zodat de client weet welke bestanden het moet opvragen.\\
+\underline{sendFile} stuurt een bestand terug naar de client.\\
+\underline{sendError} stuurt een foutmelding als er iets mis gaat op de server.\\
+\underline{recieveFiles} ontvangt de bestanden bij een commit.\\
+
+\textbf{Commit}\label{commit} Dit object stelt een \\
+
+\textbf{Message}\label{message} qsdf\\
+
+
+% section klasoverzicht (end)
+
 \section{Testen}\label{test}
 \subsection{Compileren}
 Om de bestanden te compileren moet je het volgende commando uitvoeren:
 \lstinputlisting{./compile.sh}
-Of je kan de meegeleverde file \emph{compile.sh} uitvoeren. Dit zal in de folder waarin je de commando's uitvoert of waarin je het script uitvoert, klasse bestanden genereren.
+Of je kan de meegeleverde file \emph{compile.sh} uitvoeren.\\ Dit zal een \emph{bin} map maken waarin alle klasse bestanden staan. 
 \subsection{Uitvoeren}
-Om de client uit te voeren moet je 
+Om de client uit te voeren kan je volgende commando's uitvoeren:\\
+\lstinputlisting{./runClient.sh}
+Je kan \emph{~/} vervangen door een directory die je zelf wilt.\\
+Je kan ook het bestand \emph{runClient.sh} uitvoeren. Dit zal de client dan uitvoeren in de home directory van je systeem.\\
+Om de server te testen vervang je \emph{ClientMain} door \emph{ServerMain}. Je kan om meerdere server repository's uit te voeren, meerdere paden meegeven.\\Je kan ook \emph{runServer.sh} uitvoeren deze zal een serverrepository uitvoeren in je home directory. Let wel op dat je niet zowel een client- en serverrepository in dezelfde map uitvoert op hetzelfde systeem. Dit zal leiden tot fouten.
+
+\subsection{Eclipse}
+\label{sub:eclipse}
+Je kan het meegeleverde archief project.tar.gz ook importeren in eclipse. Volg daarvoor volgende stappen:
+\begin{enumerate}
+	\item Maak een nieuw java project.
+	\item Rechterklik op het project en selecteer \emph{import}.
+	\item Selecteer \emph{General $>$ Existing Projects into Workspace} en druk op \emph{next}.
+	\item Selecteer \emph{Select archive file} en geef het archief project.tar.gz mee. Ga verder door op finish te drukken.
+\end{enumerate}
+% subsection eclipse (end)
 
 
 \end{document}
