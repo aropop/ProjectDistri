@@ -7,7 +7,7 @@ import java.util.Scanner;
 public class ClientMain {
 
 	private static final String helpText = "Commands\n"
-			+ "* add (-m \"message\") <files>         => Adds files to the repository\n"
+			+ "* add <files>                          => Adds files to the repository\n"
 			+ "* add-remote ip port                 => Adds a remote to the repository\n"
 			+ "* checkout (ip port)                 => Checksout from a remote\n"
 			+ "* commit (-m \"message\") <files>      => Commits files with a optional message\n"

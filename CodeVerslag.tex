@@ -55,15 +55,15 @@ Arno \textsc{De Witte}\\
 
 
 \section{Inleiding}\label{inleiding}
-De opdracht van het project voor het vak Gedistribueerde Systemen was om een versiebeheersysteem te maken. Er moesten enkele basis commando's worden ge\"{i}mplementeerd waaronder checkout, commit en andere. Dit moest gebeuren in Java en op het TCP/IP protocol. Er moest een eigen protocol worden ontwikkelt om tussen client en server te kunnen communiceren.
+De opdracht van het project voor het vak Gedistribueerde Systemen was om een versiebeheersysteem te maken. Er moesten enkele basis commando's worden ge\"{i}mplementeerd waaronder checkout, commit en andere. Dit moest gebeuren in Java en op het TCP/IP protocol. Er moest een eigen protocol worden ontwikkelt om tussen client en server te kunnen communiceren. In dit document staat een korte samenvatting over het project zodat ermee aan de slag kan worden gegaan.
 
 \section{Overzicht}
 \label{sec:overzicht}
-Mijn versiebeheersysteem bestaat uit twee delen. Je hebt de client waar je als gebruiker zelf commando's aan meegeeft. Aan de andere kant heb je de server. Deze moet enkel worden opgestart en functioneert daarna volledig autonoom aan de hand van clients die berichten sturen.\\
-Beide delen van het systeem slaan hun informatie op in een verborgen map (.vc) die zich in de root van pad van het repository bevindt. Hierin wordt bijvoorbeeld de commits in opgeslagen, alsook de laatst commited versie van een bestand.\\
+Dit versiebeheersysteem bestaat uit twee delen. Er is de client waar je als gebruiker zelf commando's aan meegeeft. Aan de andere kant is er de server. Deze moet enkel worden opgestart en functioneert daarna volledig autonoom aan de hand van clients die berichten sturen.\\
+Beide delen van het systeem slaan hun informatie op in een verborgen map (.vc) die zich in de root van het pad van het repository bevindt. Hierin wordt bijvoorbeeld de commits in opgeslagen, alsook de laatst commited versie van een bestand.\\
 Er is gekozen om voor elke commit een apart bestand bij te houden. Dit gebeurt op de server. De server bezit dus voor elk bestand al de oudere commits. Er wordt dus niet gewerkt met delta's waar enkel verschillen worden bijgehouden.\\
-Verder ondersteunt dit systeem ook mappen. Dit wil zeggen dat je in het pad waarin je je repository hebt ge\"{i}nitialiseerd, mappen kan hebben met daarin bestanden. Al je bestanden hoeven dus niet in de root van je map te staan.\\
-De server is ook multithreaded. Dit wil zeggen dat hij op verschillende clients tegelijkertijd kan antwoorden. Hierbij is rekening gehouden met de integriteit van het systeem. Er kunnen bijvoorbeeld geen twee commits op hetzelfde moment worden afgehandeld.
+Verder ondersteunt dit systeem ook mappen. Dit wil zeggen dat je in het pad waarin je je repository hebt ge\"{i}nitialiseerd, mappen kan hebben met daarin bestanden. Al je bestanden hoeven dus niet in de root van je map te staan. Alle soorten bestanden (tekstuele, media, binaire, ...) worden ondersteunt. Al werkt het verschil tussen 2 soorten bestanden enkel met tekstuele bestanden.\\
+De server is ook multithreaded. Dit wil zeggen dat hij op verschillende clients tegelijkertijd kan antwoorden. Hierbij is rekening gehouden met de integriteit van het systeem. Er kunnen bijvoorbeeld geen twee commits op hetzelfde moment worden afgehandeld.\\
 % section overzicht (end)
 
 \section{Klasse overzicht}
@@ -73,15 +73,15 @@ Dit project is opgedeeld in verschillende klassen. Deze worden hieronder kort be
 \textbf{ClientMain} is de klasse waarmee de client gestart wordt. Ze heeft enkel de main procedure en een hulp functie om een help tekst uit te printen. In de main procedure wordt een read-eval-print loop gestart. Er wordt telkens een commando van de standaard input gelezen. Dit wordt meegegeven aan de client repository\footnote{Sommige commando's zoals open en list gebruiken de repository enkel om het pad te vragen} en die gaat het commando dan verwerken.\\
 
 \textbf{Repository} is de abstracte klasse waarvan de clientrepository\ref{cr} en serverrepository\ref{sr} overerven. Deze bevat een constructor die voor zowel de twee kinderen dezelfde is. Deze gaat na of de repository al eens is gestart in het meegegeven pad. Dit wilt zeggen dat de verbogen map al is aangemaakt. Als dit het geval is roept het de procedure \underline{readFromDir} op. Deze leest de opgeslagen informatie in.\\
-Als de map nog niet is aangemaakt, zal de constructor deze zelf aanmaken. Dit gebeurt aan de hand van de \underline{createFolder} procedure. Inclusief alle bestanden waarin informatie wordt opgeslagen. In de map bevinden zich 2 bestanden 'files' en 'commits'. De eerste bevat alle bestanden in de repository samen met hun laatste commit, de tweede bevat alle commits.\\
+Als de map nog niet is aangemaakt, zal de constructor deze zelf aanmaken. Dit gebeurt aan de hand van de \underline{createFolder} procedure. Inclusief alle bestanden waarin informatie wordt opgeslagen. In de map bevinden zich 2 bestanden 'files' en 'commits'. De eerste bevat alle bestanden in de repository samen met hun laatste commit, de tweede bevat alle commits. Er zijn ook twee submappen, 'latest' waarin de laatste commited versie van elk bestand wordt opgeslagen en 'oldCommits' waarin oudere versies van bestanden worden in opgeslagen.\\
 De Repository heeft ook nog een getter voor het pad (\underline{getPath}) en een hulpprocedure die het files bestand wegschrijft (\underline{writeFilesFile}).\\
 Als eigenschappen heeft de repository een pad waarin de repository zich bevindt, een map met bestanden die als waarde de laatste commitid hebben. Als laatste heeft het ook nog een map met commitId als sleutel en als waardes de commit\ref{commit} objecten zelf.\\
 
 \textbf{ClientRepository}\label{cr}
-Deze klasse stelt ontvangt alle commando's van de client. De klasse heeft als extra eigenschappen een IP en poort voor een server. Hieronder een overzicht van de belangrijkste procedures.\\
-\underline{add-remote} gaat een server toevoegen aan de repository.\\
-\underline{addFile} voegt een bestand toe aan de commit.\\
-\underline{addCommit} gaat een nieuwe commit toevoegen. Hiervoor wordt eerst een lijst met bestanden en hun laatste commit opgevraagd. Zo kan er worden nagegaan of er geen conflict optreed bij het toepassen van de commit. Als er geen probleem is wordt de commit samen met zijn bestanden doorgestuurd naar de server.\\
+Deze klasse stelt ontvangt alle commando's van de client. De klasse heeft als extra eigenschappen een IP en poort voor een server. Hieronder een overzicht van de belangrijkste procedures. Merk op dat de meeste procedures overeen komen met de commando's die kunnen worden gebruikt.\\
+\underline{add-remote} gaat een server toevoegen aan de repository. Deze remote wordt in een extra bestand ('remote') opgeslagen.\\
+\underline{addFile} voegt een bestand toe aan de repository.\\
+\underline{addCommit} gaat een nieuwe commit toevoegen. Hiervoor wordt eerst een lijst met bestanden en hun laatste commit opgevraagd. Zo kan er worden nagegaan of er geen conflict optreed bij het toepassen van de commit. Als er geen probleem is wordt de commit samen met zijn bestanden doorgestuurd naar de server. Een commit kan enkel worden uitgevoerd wanneer de server 1 commit (de toe te voegen commit) achter de client zit.\\
 \underline{checkout} kopieert alle bestanden en commits van een server. Deze kan worden meegegeven anders wordt de huidige server gebruikt.\\
 \underline{status} geeft een overzicht van de repository. Het geeft een overzicht van alle bestanden, of deze bestanden aangepast zijn sinds de laatste commit en of deze commit achter de server zit.\\
 \underline{update} doet hetzelfde als checkout maar gaat ervan uit dat de repository al is ge\"{i}nitialiseerd is. Het gaat de bestaande bestanden opslaan in de oldCommits map opslaan. Zodat wanneer er een diff wordt uitgevoerd het oude bestand niet moet worden opgevraagd.\\
@@ -101,18 +101,40 @@ Deze klasse implementeert Runnable omdat er zo meerdere serverrepository's op he
 \underline{sendError} stuurt een foutmelding als er iets mis gaat op de server.\\
 \underline{recieveFiles} ontvangt de bestanden bij een commit.\\
 
-\textbf{Commit}\label{commit} Dit object stelt een \\
+\textbf{Commit}\label{commit} Dit object stelt een commit voor. Het heeft als eigenschappen een lijst met files, deze worden voorgesteld als strings met relatieve paden zodat wanneer je ze naar de server stuurt deze ook weet waar ze staan. Verder kan een commit ook een message hebben en heeft elke commit een uniek id\footnote{Dit gebeurt aan de hand van UUID (universally unique identifier), meer info over UUID http://docs.oracle.com/javase/7/docs/api/java/util/UUID.html} en een tijdstip waarop deze is aangemaakt. Voor deze eigenschappen heeft het steeds getters.\\
+De enige andere procedures van deze klasse (\underline{readFromString} en \underline{writeToString}) zorgen ervoor dat de klasse gemakkelijk kan worden weggeschreven worden naar bestanden en naar de server.\\
 
-\textbf{Message}\label{message} qsdf\\
 
+\textbf{Message}\label{message} Deze klasse wordt gebruik voor de communicatie tussen de client en de server. Het implementeert serializable zodat het aan de hand van een ObjectOutputStream\footnote{http://docs.oracle.com/javase/7/docs/api/java/io/ObjectInputStream.html} of ObjectInputStream\footnote{http://docs.oracle.com/javase/7/docs/api/java/io/ObjectOutputStream.html} deze kan worden verzonden of ontvangen.\ref{sec:protocol} Deze klasse kan verschillende types (MessageType) hebben zodat gemakkelijk weet of het een fout is.\\
+Elke Message heeft een bericht (String). Je kan ook een seperator meegeven. Dit is een scheidingsteken zo kunnen arrays en andere datastructuren gemakkelijk doorsturen.\\
+
+\textbf{ServerMain}\label{servermain} Is de klasse die de server start. Het maakt evenveel serverrepository's als argumenten die eraan worden meegegeven. Deze argumenten moeten dan paden zijn waarin een repository gestart moet worden. Elke repository wordt in een verschillende thread gestart. Er wordt namelijk vanuit gegaan dat alle repository's zich op een ander pad bevinden. Zo kan er op \'{e}\'{en} machine verschillende servers draaien. 
 
 % section klasoverzicht (end)
 
+\section{Protocol}
+\label{sec:protocol}
+De boodschappen tussen de server en client gebeuren zoals eerder vermeld\ref{message} uitgevoerd over een objectstream. Deze kunnen worden verkregen aan de hand van een Socket \footnote{http://docs.oracle.com/javase/7/docs/api/java/net/Socket.html} langs de client zijde en een ServerSocket \footnote{http://docs.oracle.com/javase/7/docs/api/java/net/ServerSocket.html} langs de server zijde. Deze voorzien een connectie op basis van het TCP\footnote{Transmission Control Protocol} dat dan weer op het IP\footnote{Internet Protocol} zit.\\
+Er wordt voor elke afzonderlijke actie een nieuwe connectie opgestart. Om te voorkomen dat er een connectie open wordt gehouden op de server, terwijl er op de client niets gebeurt.\\
+De berichten van de client zijn telkens strings, deze worden dan via een dispatch op server verdeeld over de verschillende functies. Elke specifieke opdracht heeft zijn eigen bericht. Dit zijn constanten die je kan terug vinden in het ClientRepository bestand.\\
+Via zo een stream kunnen er naast objecten ook byte arrays worden verstuurd. Dit wordt gebruikt om bestanden te versturen. Omdat de bestanden als rauwe data (bytes) worden ingelezen en weggeschreven is het dus ook mogelijk om binaire bestanden toe te voegen aan de repository.\\
+
+
+% section protocol (end)
+
+\section{Libraries}
+\label{sec:libraries}
+In het systeem wordt gebruik gemaakt van 2 libraries. De eerst is IOUtils\footnote{http://commons.apache.org/proper/commons-io/apidocs/org/apache/commons/io/IOUtils.html \& http://commons.apache.org/proper/commons-io/} uit de Apache Commons verzameling. Deze library wordt gebruikt omdat het verschillende Input/Output handelingen versimpeld. Het bevat bijvoorbeeld een methode die de output van een stream kopi\"{eert} in een inputstream. Verder bevat deze library ook enkele procedures die het gebruik van bestanden vereenvoudigd. Bijvoorbeeld een kopi\"{e}eer procedure en een procedure die de inhoud vergelijkt.\\
+Deze library is als jar bestand terug te vinden in de 'lib' map van het project.
+
+Als tweede library is er gebruik gemaakt van Google's diff\_match\_patch API. Deze maakt het mogelijk om de verschillen tussen 2 strings weer te geven. Dit wordt gebruikt bij het diff commando. De library is meegeleverd als java bestand in de 'src' map van het project.
+% section libraries (end)
+
 \section{Testen}\label{test}
 \subsection{Compileren}
-Om de bestanden te compileren moet je het volgende commando uitvoeren:
+Om de bestanden te compileren moet het volgende commando worden uitvoerd:
 \lstinputlisting{./compile.sh}
-Of je kan de meegeleverde file \emph{compile.sh} uitvoeren.\\ Dit zal een \emph{bin} map maken waarin alle klasse bestanden staan. 
+Of de meegeleverde file \emph{compile.sh} kan worden uitvoert.\\ Dit zal een \emph{bin} map maken waarin alle klasse bestanden staan. 
 \subsection{Uitvoeren}
 Om de client uit te voeren kan je volgende commando's uitvoeren:\\
 \lstinputlisting{./runClient.sh}
@@ -130,6 +152,27 @@ Je kan het meegeleverde archief project.tar.gz ook importeren in eclipse. Volg d
 	\item Selecteer \emph{Select archive file} en geef het archief project.tar.gz mee. Ga verder door op finish te drukken.
 \end{enumerate}
 % subsection eclipse (end)
+
+\subsection{Gebruik}
+\label{sub:gebruik}
+Om het programma te gebruiken (vanaf de client zijde) moeten er verschillende commando's worden gebruikt. Om een overzicht te krijgen van alle commando's kan er 'help' worden ingegeven. Er wordt dan een lijst met alle commando's weergeven.\\
+Hier is een klein overzicht.
+\begin{itemize}
+\item[\textbf{add-remote}] Voegt een server toe aan de client. Er moet een ip adres en poort meegeven.
+\item[\textbf{add}] Voegt een bestand of bestanden toe aan de repository. De absolute of relatieve paden naar het bestand moeten worden meegeven.
+\item[\textbf{checkout}] Kopieert de server repository lokaal. Er kan een ip en poort worden meegeven als je een specifieke server wilt clonen.
+\item[\textbf{commit}] Voegt een commit toe en verstuurt deze dan naar de server. Er kan optioneel (via de optie -m) een bericht worden meegeven. Er moet ook minstens 1 bestand worden meegegeven.
+\item[\textbf{diff}] Geeft de verschillen in een bestand tussen 2 commits weer. Als er maar 1 commit-id wordt meegegeven, zal het verschil met de huidige staat van het bestand worden weergegeven.
+\item[\textbf{list-commits}] Geeft een overzicht van alle commits weer. Ook commits die nog niet lokaal staan.
+\item[\textbf{status}] Toont de huidige staat van alle bestanden. Er wordt weergegeven in welke commit het bestand laatst is opgeslagen, of het bestand sindsdien is aangepast en of het achter op de server zit.\\
+Er wordt ook weergegeven of de client al verbonden is met een server en of deze server effectief online is.
+\item[\textbf{open}] Gaat een bestand openen.
+\item[\textbf{list}] Geeft alle bestanden in het pad weer.
+\item[\textbf{help}] Geeft een overzicht van alle commando's die kunnen worden gebruikt.
+\item[\textbf{exit}] Verlaat het systeem.
+\end{itemize}
+
+% subsection  (end)
 
 
 \end{document}
